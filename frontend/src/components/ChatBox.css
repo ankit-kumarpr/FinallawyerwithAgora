@@ -1,0 +1,353 @@
+/* Base Styles */
+.legal-chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  max-width: 900px;
+  margin: 0 auto;
+  background-color: #f8f9fa;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  color: #333;
+}
+
+/* Connection Status */
+.connection-status {
+  padding: 8px 15px;
+  font-size: 0.8rem;
+  text-align: center;
+  font-weight: 500;
+}
+
+.connection-status.connected {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.connection-status.disconnected {
+  background-color: #ffebee;
+  color: #c62828;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+/* Header Styles */
+.legal-chat-header {
+  background-color: #1a365d;
+  color: white;
+  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.lawyer-profile {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.lawyer-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background-color: #2c5282;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: bold;
+  color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.lawyer-info h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.lawyer-title {
+  margin: 3px 0 0;
+  font-size: 0.85rem;
+  opacity: 0.9;
+  font-style: italic;
+}
+
+.session-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.session-timer {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.9rem;
+  background-color: rgba(255, 255, 255, 0.1);
+  padding: 5px 10px;
+  border-radius: 4px;
+}
+
+.icon-clock {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 18c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8zm.5-13H11v6l5.2 3.2.8-1.3-4.5-2.7V7z"/></svg>');
+  background-repeat: no-repeat;
+}
+
+.session-status {
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.session-status.active {
+  background-color: #38a169;
+  color: white;
+}
+
+.session-status.expired {
+  background-color: #e53e3e;
+  color: white;
+}
+
+.end-session-btn {
+  background-color: transparent;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.2s;
+}
+
+.end-session-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Messages Area */
+.legal-chat-messages {
+  flex: 1;
+padding: 20px;
+  overflow-y: auto;
+    overflow-y: auto;
+  background-color: #f8f9fa;
+  background-image: 
+    linear-gradient(#f1f5f9 1px, transparent 1px),
+    linear-gradient(90deg, #f1f5f9 1px, transparent 1px);
+  background-size: 20px 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.empty-chat {
+  text-align: center;
+  margin: auto;
+  color: #4a5568;
+  padding: 20px;
+  max-width: 400px;
+}
+
+.empty-chat-icon {
+  font-size: 3rem;
+  margin-bottom: 15px;
+}
+
+.empty-chat h4 {
+  color: #1a365d;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.empty-chat p {
+  margin-bottom: 8px;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.legal-message {
+  max-width: 75%;
+  margin-bottom: 15px;
+  position: relative;
+}
+
+.legal-message.sent {
+  align-self: flex-end;
+}
+
+.legal-message.received {
+  align-self: flex-start;
+}
+
+.message-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  font-size: 0.75rem;
+  color: #4a5568;
+}
+
+.message-sender {
+  font-weight: 600;
+  color: #1a365d;
+}
+
+.message-time {
+  opacity: 0.7;
+}
+
+.message-content {
+  padding: 12px 16px;
+  border-radius: 8px;
+  word-wrap: break-word;
+  line-height: 1.5;
+  font-size: 0.95rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.sent .message-content {
+  background-color: #2b6cb0;
+  color: white;
+  border-top-right-radius: 0;
+}
+
+.received .message-content {
+  background-color: white;
+  color: #2d3748;
+  border: 1px solid #e2e8f0;
+  border-top-left-radius: 0;
+}
+
+/* Input Area */
+.legal-chat-input {
+  padding: 15px;
+  background-color: white;
+  border-top: 1px solid #e2e8f0;
+}
+
+.input-container {
+  display: flex;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.input-container input {
+  flex: 1;
+  padding: 12px 15px;
+  border: none;
+  outline: none;
+  font-size: 0.95rem;
+  font-family: 'Georgia', 'Times New Roman', serif;
+}
+
+.input-container input:disabled {
+  background-color: #f8f9fa;
+}
+
+.send-btn {
+  background-color: #2b6cb0;
+  color: white;
+  border: none;
+  padding: 0 20px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.send-btn:hover {
+  background-color: #2c5282;
+}
+
+.send-btn:disabled {
+  background-color: #a0aec0;
+  cursor: not-allowed;
+}
+
+.security-notice {
+  margin-top: 10px;
+  text-align: center;
+  color: #718096;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.icon-lock {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23718096"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>');
+  background-repeat: no-repeat;
+}
+
+/* Session Ended */
+.session-ended {
+  padding: 20px;
+  text-align: center;
+  background-color: white;
+  border-top: 1px solid #e2e8f0;
+}
+
+.session-ended p {
+  margin-bottom: 15px;
+  color: #4a5568;
+}
+
+.request-new-session {
+  background-color: #2b6cb0;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.request-new-session:hover {
+  background-color: #2c5282;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .legal-chat-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+    padding: 15px;
+  }
+  
+  .session-info {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .legal-message {
+    max-width: 85%;
+  }
+  
+  .empty-chat {
+    padding: 15px;
+  }
+}
+.legal-message.client {
+  background-color: #f0fff4;
+}
+
+.legal-message.lawyer {
+  background-color: #e8f0ff;
+}

@@ -1,0 +1,16 @@
+.login-container {
+  background: linear-gradient(to right, #2b5876, #4e4376);
+}
+
+.login-box {
+  width: 100%;
+  max-width: 400px;
+}
+
+.form-label {
+  font-weight: 600;
+}
+
+input::placeholder {
+  color: #bbb;
+}

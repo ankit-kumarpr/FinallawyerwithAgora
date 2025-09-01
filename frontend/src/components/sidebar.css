@@ -1,0 +1,116 @@
+/* -----------------------
+# sidebar
+-------------------------- */
+.sidebar {
+  position: fixed;
+  top: 79px;
+  left: 0px;
+  bottom: 0;
+  width: 250px;
+  z-index: 9999;
+  padding: 20px 15px;
+  overflow-y: auto;
+  background: #1c1c84;
+
+
+  /* border-radius: 16px; */
+  color: #ffffff;
+  box-shadow: rgba(0, 0, 0, 0.2) 0px 20px 30px;
+  transition: all 0.3s ease-in-out;
+}
+
+/* Scrollbar */
+.sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 4px;
+}
+
+/* Sidebar Nav */
+.sidebar-nav {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.sidebar-nav li {
+  margin-bottom: 6px;
+  list-style: none;
+}
+
+/* Sidebar Nav Link */
+.sidebar-nav .nav-link {
+  display: flex;
+  align-items: center;
+  color: whitesmoke;
+  font-weight: 500;
+  font-size: 15px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  text-decoration: none;
+  gap: 10px;
+  transition: background 0.3s ease;
+}
+
+.sidebar-nav .nav-link:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+/* Dropdown Chevron Animation */
+.sidebar-nav .nav-link .bi-chevron-down {
+  margin-left: auto;
+  transition: transform 0.2s ease-in-out;
+}
+
+.sidebar-nav .nav-link:not(.collapsed) .bi-chevron-down {
+  transform: rotate(180deg);
+}
+
+/* Submenu */
+.sidebar-nav .nav-content {
+  list-style: none;
+  padding-left: 20px;
+  margin-top: 4px;
+}
+
+.sidebar-nav .nav-content li a {
+  display: block;
+  padding: 6px 0;
+  color: #e6f7ff;
+  font-size: 14px;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.sidebar-nav .nav-content li a:hover {
+  color: #ffffff;
+}
+
+/* Sidebar Toggle for Small Screens */
+@media (max-width: 1199px) {
+  .sidebar {
+    left: -260px;
+  }
+  .toggle-sidebar .sidebar {
+    left: 0;
+  }
+}
+
+@media (min-width: 1200px) {
+  #main,
+  #footer {
+    margin-left: 250px;
+  }
+
+  .toggle-sidebar #main,
+  .toggle-sidebar #footer {
+    margin-left: 0;
+  }
+
+  .toggle-sidebar .sidebar {
+    left: -260px;
+  }
+}

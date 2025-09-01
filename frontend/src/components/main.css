@@ -1,0 +1,15 @@
+/* -------------------------------------------
+# Main
+---------------------------------------------- */
+
+#main{
+    margin-top: 80px;
+    padding: 20px 18px;
+    transition: all 0.3s;
+}
+
+@media (max-width:1199px) {
+    #main {
+        padding: 20px;
+    }
+}
