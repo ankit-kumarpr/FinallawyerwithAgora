@@ -35,7 +35,7 @@ const AdminLawyerManagement = () => {
     setIsLoading(true);
     try {
       const res = await axios.get(
-        "http://localhost:4000/lawapi/physical-lawyers/getphylawyers"
+        "https://finallawyerwithagora.onrender.com/lawapi/physical-lawyers/getphylawyers"
       );
       const data = res?.data;
       const lawyersList = Array.isArray(data) ? data : data?.data;
@@ -81,14 +81,14 @@ const AdminLawyerManagement = () => {
       if (editingId) {
         // EDIT MODE
         const response = await axios.post(
-          `http://localhost:4000/lawapi/physical-lawyers/updatelawyer/${editingId}`,
+          `https://finallawyerwithagora.onrender.com/lawapi/physical-lawyers/updatelawyer/${editingId}`,
           payload
         );
         toast.success("Lawyer updated successfully");
       } else {
         // ADD MODE
         const response = await axios.post(
-          "http://localhost:4000/lawapi/physical-lawyers/add-lawyer",
+          "https://finallawyerwithagora.onrender.com/lawapi/physical-lawyers/add-lawyer",
           payload
         );
         toast.success("Lawyer added successfully");
@@ -143,7 +143,7 @@ const AdminLawyerManagement = () => {
     setIsLoading(true);
     try {
       await axios.delete(
-        `http://localhost:4000/lawapi/physical-lawyers/dellawyer/${id}`
+        `https://finallawyerwithagora.onrender.com/lawapi/physical-lawyers/dellawyer/${id}`
       );
       toast.success("Lawyer deleted");
       fetchLawyers();

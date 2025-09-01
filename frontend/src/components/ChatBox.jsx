@@ -203,7 +203,7 @@ const ChatBox = ({
     const fetchChatHistory = async () => {
       try {
         const res = await axios.get(
-          `http://localhost:4000/lawapi/common/gethistory/${bookingId}`,
+          `https://finallawyerwithagora.onrender.com/lawapi/common/gethistory/${bookingId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (!res.data.error && Array.isArray(res.data.data)) {
@@ -326,7 +326,7 @@ const ChatBox = ({
     // Persist the message to the database in the background
     // try {
     //   await axios.post(
-    //     'http://localhost:4000/lawapi/common/sendmessage',
+    //     'https://finallawyerwithagora.onrender.com/lawapi/common/sendmessage',
     //     { bookingId, content: message, files: [] },
     //     { headers: { Authorization: `Bearer ${token}` } }
     //   );
@@ -374,7 +374,7 @@ const ChatBox = ({
 
       try {
         await axios.post(
-          "http://localhost:4000/lawapi/common/sendmessage",
+          "https://finallawyerwithagora.onrender.com/lawapi/common/sendmessage",
           {
             bookingId,
             content: `File: ${file.name}`,

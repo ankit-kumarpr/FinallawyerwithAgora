@@ -247,7 +247,7 @@ const PaymentModal = ({
 
     try {
       const verifyRes = await fetch(
-        "http://localhost:4000/lawapi/common/paymentverify",
+        "https://finallawyerwithagora.onrender.com/lawapi/common/paymentverify",
         {
           method: "POST",
           headers: {
@@ -374,7 +374,7 @@ const PaymentModal = ({
 
     try {
       const orderRes = await fetch(
-        "http://localhost:4000/lawapi/common/createorder",
+        "https://finallawyerwithagora.onrender.com/lawapi/common/createorder",
         {
           method: "POST",
           headers: {

@@ -99,7 +99,7 @@ const LawyerProfileModal = ({ show, handleClose, lawyer }) => {
   };
 
   const lawyerImageUrl = lawyer?.lawyerImage
-    ? `http://localhost:4000${lawyer.lawyerImage}`
+    ? `https://finallawyerwithagora.onrender.com${lawyer.lawyerImage}`
     : null;
 
   return (

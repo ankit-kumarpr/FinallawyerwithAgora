@@ -62,7 +62,7 @@ const LawyerManagement = () => {
       try {
         const token = sessionStorage.getItem("token");
         const response = await axios.get(
-          "http://localhost:4000/lawapi/common/lwayerlist",
+          "https://finallawyerwithagora.onrender.com/lawapi/common/lwayerlist",
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -101,7 +101,7 @@ const LawyerManagement = () => {
       const token = sessionStorage.getItem("token");
 
       await axios.post(
-        `http://localhost:4000/lawapi/auth/verify-lawyer/${lawyer.lawyerId}`,
+        `https://finallawyerwithagora.onrender.com/lawapi/auth/verify-lawyer/${lawyer.lawyerId}`,
         {},
         {
           headers: {
@@ -137,7 +137,7 @@ const LawyerManagement = () => {
     try {
       setDeletingId(lawyerToDelete._id);
       const token = sessionStorage.getItem("token");
-      const url = `http://localhost:4000/lawapi/common/dellawyer/${lawyerToDelete.lawyerId}`;
+      const url = `https://finallawyerwithagora.onrender.com/lawapi/common/dellawyer/${lawyerToDelete.lawyerId}`;
 
       const response = await axios.post(
         url,
@@ -194,7 +194,7 @@ const LawyerManagement = () => {
 
     try {
       const token = sessionStorage.getItem("token");
-      const url = `http://localhost:4000/lawapi/common/updatelawyer/${lawyerToEdit.lawyerId}`;
+      const url = `https://finallawyerwithagora.onrender.com/lawapi/common/updatelawyer/${lawyerToEdit.lawyerId}`;
 
       // The editedLawyerData already contains all fields including consultation_fees
       await axios.post(url, editedLawyerData, {

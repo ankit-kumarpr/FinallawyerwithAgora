@@ -24,7 +24,7 @@ function Mybooking() {
 
   const fetchLawyerBooking = async () => {
     try {
-      const url = `http://localhost:4000/lawapi/common/lawyerbooking`;
+      const url = `https://finallawyerwithagora.onrender.com/lawapi/common/lawyerbooking`;
       const headers = {
         "Content-Type": "application/json",
         Accept: "application/json",
@@ -79,7 +79,7 @@ function Mybooking() {
 
   const handleStatusUpdate = async (_id, status) => {
     try {
-      const url = `http://localhost:4000/lawapi/common/bookings/${_id}`;
+      const url = `https://finallawyerwithagora.onrender.com/lawapi/common/bookings/${_id}`;
       const headers = {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,

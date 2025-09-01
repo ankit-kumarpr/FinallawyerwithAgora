@@ -64,7 +64,7 @@ const LawyerCard = ({ lawyer, onViewProfile }) => {
 
     try {
       await axios.post(
-        "http://localhost:4000/lawapi/common/sendlawyerrequest",
+        "https://finallawyerwithagora.onrender.com/lawapi/common/sendlawyerrequest",
         payload
       );
       toast.success("Your request has been submitted successfully!");

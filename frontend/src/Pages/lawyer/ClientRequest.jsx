@@ -33,7 +33,7 @@ const ClientRequests = () => {
         const lawyerId = lawyerData?.lawyerId || lawyerData?._id;
 
         const res = await axios.get(
-          `http://localhost:4000/lawapi/common/lawyerrequest/${lawyerId}`,
+          `https://finallawyerwithagora.onrender.com/lawapi/common/lawyerrequest/${lawyerId}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -102,7 +102,7 @@ const ClientRequests = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.put(
-        `http://localhost:4000/lawapi/common/lawyerrequest/${requestId}`,
+        `https://finallawyerwithagora.onrender.com/lawapi/common/lawyerrequest/${requestId}`,
         { status: newStatus },
         {
           headers: {

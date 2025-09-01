@@ -42,8 +42,9 @@ const AuthPage = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
-  const API_URL1 = "http://localhost:4000/lawapi/auth";
-  const API_URL = "http://localhost:4000/lawapi/auth/register";
+  const API_URL1 = "https://finallawyerwithagora.onrender.com/lawapi/auth";
+  const API_URL =
+    "https://finallawyerwithagora.onrender.com/lawapi/auth/register";
   const redirect = new URLSearchParams(location.search).get("redirect");
 
   // Toggle between login and registration with animation

@@ -62,7 +62,7 @@ const LawyerHistory = () => {
         setLoading(true);
         setError(null);
         const response = await axios.get(
-          "http://localhost:4000/lawapi/common/lwayerlist",
+          "https://finallawyerwithagora.onrender.com/lawapi/common/lwayerlist",
           {
             headers: {
               "Content-Type": "application/json",
@@ -87,7 +87,7 @@ const LawyerHistory = () => {
       setLoading(true);
       setError(null);
       const response = await axios.get(
-        `http://localhost:4000/lawapi/common/lawyertransectionhistoty/${lawyerId}`,
+        `https://finallawyerwithagora.onrender.com/lawapi/common/lawyertransectionhistoty/${lawyerId}`,
         {
           headers: {
             "Content-Type": "application/json",

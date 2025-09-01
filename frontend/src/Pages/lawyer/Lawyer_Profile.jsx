@@ -37,7 +37,7 @@ const LawyerProfile = () => {
       return;
     }
 
-    const newSocket = io("http://localhost:4000", {
+    const newSocket = io("https://finallawyerwithagora.onrender.com", {
       auth: { token },
       transports: ["websocket"],
     });
@@ -57,7 +57,7 @@ const LawyerProfile = () => {
           Authorization: `Bearer ${token}`,
         };
         const response = await axios.get(
-          "http://localhost:4000/lawapi/auth/profile",
+          "https://finallawyerwithagora.onrender.com/lawapi/auth/profile",
           { headers }
         );
         setData(response.data.data);
@@ -163,7 +163,7 @@ const LawyerProfile = () => {
   const handleSaveProfile = (e) => {
     e.preventDefault();
     handleApiCall(
-      `http://localhost:4000/lawapi/common/updatelawyer/${data.lawyerId}`,
+      `https://finallawyerwithagora.onrender.com/lawapi/common/updatelawyer/${data.lawyerId}`,
       editedData,
       "Profile updated successfully",
       "Update failed"
@@ -172,7 +172,7 @@ const LawyerProfile = () => {
 
   const handleStatusUpdate = (newStatus) => {
     handleApiCall(
-      `http://localhost:4000/lawapi/common/updatelawyer/${data.lawyerId}`,
+      `https://finallawyerwithagora.onrender.com/lawapi/common/updatelawyer/${data.lawyerId}`,
       { status: newStatus },
       "Status updated successfully!",
       "Failed to update status"
@@ -212,7 +212,7 @@ const LawyerProfile = () => {
 
     try {
       const response = await axios.post(
-        `http://localhost:4000/lawapi/common/updatelawyer/${data.lawyerId}`,
+        `https://finallawyerwithagora.onrender.com/lawapi/common/updatelawyer/${data.lawyerId}`,
         formData,
         {
           headers: {
@@ -393,7 +393,7 @@ const LawyerProfile = () => {
                 />
               ) : data?.lawyerImage ? (
                 <img
-                  src={`http://localhost:4000${data.lawyerImage}`}
+                  src={`https://finallawyerwithagora.onrender.com${data.lawyerImage}`}
                   alt={data.name}
                   className="profile-picture"
                   onError={(e) => {

@@ -29,7 +29,7 @@ const ClientHistoryPage = () => {
       try {
         const token = sessionStorage.getItem("token");
         const response = await axios.get(
-          `http://localhost:4000/lawapi/common/userhistory/${currentUser?.userId}`,
+          `https://finallawyerwithagora.onrender.com/lawapi/common/userhistory/${currentUser?.userId}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

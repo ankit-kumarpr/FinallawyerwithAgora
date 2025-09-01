@@ -45,7 +45,7 @@ const useLawyerData = () => {
         if (!token) throw new Error("No authentication token found");
 
         const profileRes = await axios.get(
-          "http://localhost:4000/lawapi/auth/profile",
+          "https://finallawyerwithagora.onrender.com/lawapi/auth/profile",
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
@@ -218,7 +218,7 @@ const LawyerDashboard = () => {
 
     try {
       const res = await fetch(
-        `http://localhost:4000/lawapi/common/bookings/${bookingId}`,
+        `https://finallawyerwithagora.onrender.com/lawapi/common/bookings/${bookingId}`,
         {
           method: "PUT",
           headers: {
@@ -308,7 +308,7 @@ const LawyerDashboard = () => {
 
     const handleBookingNotification = (data) => {
       console.log("📥 Booking notification received:", data);
-      
+
       // Only show notification modal for chat sessions
       if (data.mode === "chat") {
         setNotificationData({

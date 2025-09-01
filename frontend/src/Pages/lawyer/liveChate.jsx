@@ -1,10 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Modal, Button, Alert, Spinner, Badge, Card, ListGroup } from 'react-bootstrap';
-import { getSocket } from '../../components/socket';
-import AgoraRTC from 'agora-rtc-sdk-ng';
+import React, { useState, useEffect, useRef } from "react";
+import {
+  Modal,
+  Button,
+  Alert,
+  Spinner,
+  Badge,
+  Card,
+  ListGroup,
+} from "react-bootstrap";
+import { getSocket } from "../../components/socket";
+import AgoraRTC from "agora-rtc-sdk-ng";
 
 const Livechat = () => {
-  const [connectionStatus, setConnectionStatus] = useState('connecting');
+  const [connectionStatus, setConnectionStatus] = useState("connecting");
   const [socketId, setSocketId] = useState(null);
   const [incomingCalls, setIncomingCalls] = useState([]);
   const [activeCalls, setActiveCalls] = useState([]);
@@ -16,8 +24,8 @@ const Livechat = () => {
   const [localTracks, setLocalTracks] = useState([]);
   const [remoteUsers, setRemoteUsers] = useState({});
   const [isInCall, setIsInCall] = useState(false);
-  const [callStatus, setCallStatus] = useState('');
-  
+  const [callStatus, setCallStatus] = useState("");
+
   const socketRef = useRef(null);
 
   // Initialize Agora client
@@ -47,7 +55,9 @@ const Livechat = () => {
         console.log("✅ Lawyer subscribed to user media:", mediaType);
 
         if (mediaType === "video") {
-          const remoteVideoContainer = document.getElementById("lawyer-remote-video");
+          const remoteVideoContainer = document.getElementById(
+            "lawyer-remote-video"
+          );
           if (remoteVideoContainer) {
             user.videoTrack.play("lawyer-remote-video");
           }
@@ -105,105 +115,111 @@ const Livechat = () => {
 
   useEffect(() => {
     const socket = getSocket();
-    const userData = JSON.parse(sessionStorage.getItem('userData'));
+    const userData = JSON.parse(sessionStorage.getItem("userData"));
     const lawyerId = userData?.lawyerId || userData?.userId;
 
     if (!socket || !lawyerId) {
-      console.warn('⚠️ Socket not initialized or missing user ID');
-      setConnectionStatus('error');
+      console.warn("⚠️ Socket not initialized or missing user ID");
+      setConnectionStatus("error");
       return;
     }
 
     socketRef.current = socket;
 
-    setConnectionStatus(socket.connected ? 'connected' : 'connecting');
+    setConnectionStatus(socket.connected ? "connected" : "connecting");
     setSocketId(socket.id);
 
     const onConnect = () => {
-      console.log('✅ Socket connected:', socket.id);
-      setConnectionStatus('connected');
+      console.log("✅ Socket connected:", socket.id);
+      setConnectionStatus("connected");
       setSocketId(socket.id);
 
-      socket.emit('join-lawyer', lawyerId, (response) => {
-        if (response?.status === 'success') {
+      socket.emit("join-lawyer", lawyerId, (response) => {
+        if (response?.status === "success") {
           console.log(`🔗 Joined lawyer room: ${lawyerId}`);
-          addApiResponse('join-lawyer', response);
+          addApiResponse("join-lawyer", response);
         } else {
-          console.error('Join failed:', response);
+          console.error("Join failed:", response);
         }
       });
     };
 
     const onDisconnect = (reason) => {
-      console.warn('🔌 Socket disconnected:', reason);
-      setConnectionStatus('disconnected');
+      console.warn("🔌 Socket disconnected:", reason);
+      setConnectionStatus("disconnected");
       setSocketId(null);
     };
 
     const onConnectError = (err) => {
-      console.error('❌ Socket error:', err);
-      setConnectionStatus('error');
+      console.error("❌ Socket error:", err);
+      setConnectionStatus("error");
       setSocketId(null);
     };
 
     const onIncomingCall = (data) => {
-      console.log('📞 Incoming call:', data);
-      addApiResponse('incoming-call', data);
-      
+      console.log("📞 Incoming call:", data);
+      addApiResponse("incoming-call", data);
+
       // Ensure user object exists with safe defaults
       const safeData = {
         ...data,
-        user: data.user || { name: 'Unknown Client', id: 'unknown' }
+        user: data.user || { name: "Unknown Client", id: "unknown" },
       };
-      
-      setIncomingCalls(prev => [...prev, safeData]);
-      
-      if (Notification.permission === 'granted') {
-        new Notification('New Consultation Request', {
+
+      setIncomingCalls((prev) => [...prev, safeData]);
+
+      if (Notification.permission === "granted") {
+        new Notification("New Consultation Request", {
           body: `Incoming ${data.mode} call from ${safeData.user.name}`,
-          icon: '/logo.png'
+          icon: "/logo.png",
         });
       }
     };
 
     const onAgoraCredentials = (data) => {
-      console.log('🔑 Received Agora credentials:', data);
-      addApiResponse('agora-credentials', data);
+      console.log("🔑 Received Agora credentials:", data);
+      addApiResponse("agora-credentials", data);
       setAgoraCredentials(data);
-      
+
       sessionStorage.setItem(`agora_${data.channelName}`, JSON.stringify(data));
-      
-      console.log('🎯 Lawyer Agora RTC Token:', data.token);
-      console.log('🎯 Lawyer Agora UID:', data.uid);
-      console.log('🎯 Agora Channel:', data.channelName);
-      
+
+      console.log("🎯 Lawyer Agora RTC Token:", data.token);
+      console.log("🎯 Lawyer Agora UID:", data.uid);
+      console.log("🎯 Agora Channel:", data.channelName);
+
       if (currentCall) {
-        setCurrentCall(prev => ({ ...prev, agora: data }));
+        setCurrentCall((prev) => ({ ...prev, agora: data }));
       }
     };
 
     const onSessionStarted = (data) => {
-      console.log('▶️ Session started:', data);
-      addApiResponse('session-started', data);
-      
+      console.log("▶️ Session started:", data);
+      addApiResponse("session-started", data);
+
       // Ensure user object exists
       const safeData = {
         ...data,
-        user: data.user || { name: 'Unknown Client', id: 'unknown' }
+        user: data.user || { name: "Unknown Client", id: "unknown" },
       };
-      
-      setIncomingCalls(prev => prev.filter(call => call.bookingId !== data.bookingId));
-      setActiveCalls(prev => [...prev, { ...safeData, status: 'active' }]);
+
+      setIncomingCalls((prev) =>
+        prev.filter((call) => call.bookingId !== data.bookingId)
+      );
+      setActiveCalls((prev) => [...prev, { ...safeData, status: "active" }]);
     };
 
     const onCallStatus = (data) => {
-      console.log('📱 Call status:', data);
-      addApiResponse('call-status', data);
-      
-      if (data.status === 'ended') {
-        setActiveCalls(prev => prev.filter(call => call.bookingId !== data.bookingId));
-        setIncomingCalls(prev => prev.filter(call => call.bookingId !== data.bookingId));
-        
+      console.log("📱 Call status:", data);
+      addApiResponse("call-status", data);
+
+      if (data.status === "ended") {
+        setActiveCalls((prev) =>
+          prev.filter((call) => call.bookingId !== data.bookingId)
+        );
+        setIncomingCalls((prev) =>
+          prev.filter((call) => call.bookingId !== data.bookingId)
+        );
+
         if (currentCall?.bookingId === data.bookingId) {
           setCurrentCall(null);
           setShowCallModal(false);
@@ -214,36 +230,36 @@ const Livechat = () => {
 
     const addApiResponse = (endpoint, data) => {
       const timestamp = new Date().toLocaleTimeString();
-      setApiResponses(prev => [
+      setApiResponses((prev) => [
         ...prev.slice(-9),
-        { endpoint, timestamp, data }
+        { endpoint, timestamp, data },
       ]);
     };
 
-    socket.on('connect', onConnect);
-    socket.on('disconnect', onDisconnect);
-    socket.on('connect_error', onConnectError);
-    socket.on('incoming-call', onIncomingCall);
-    socket.on('agora-credentials', onAgoraCredentials);
-    socket.on('session-started', onSessionStarted);
-    socket.on('call-status', onCallStatus);
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+    socket.on("connect_error", onConnectError);
+    socket.on("incoming-call", onIncomingCall);
+    socket.on("agora-credentials", onAgoraCredentials);
+    socket.on("session-started", onSessionStarted);
+    socket.on("call-status", onCallStatus);
 
     socket.onAny((event, ...args) => {
       console.log(`📡 Event [${event}]:`, args?.[0] ?? "");
     });
 
-    if ('Notification' in window && Notification.permission === 'default') {
+    if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
     }
 
     return () => {
-      socket.off('connect', onConnect);
-      socket.off('disconnect', onDisconnect);
-      socket.off('connect_error', onConnectError);
-      socket.off('incoming-call', onIncomingCall);
-      socket.off('agora-credentials', onAgoraCredentials);
-      socket.off('session-started', onSessionStarted);
-      socket.off('call-status', onCallStatus);
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+      socket.off("connect_error", onConnectError);
+      socket.off("incoming-call", onIncomingCall);
+      socket.off("agora-credentials", onAgoraCredentials);
+      socket.off("session-started", onSessionStarted);
+      socket.off("call-status", onCallStatus);
       socket.offAny();
     };
   }, [currentCall]);
@@ -251,7 +267,10 @@ const Livechat = () => {
   // Join Agora channel for lawyer
   const joinChannel = async (agoraData) => {
     if (!agoraClient || !agoraData || !agoraData.token) {
-      console.error("❌ Lawyer Agora client, data, or token not available", agoraData);
+      console.error(
+        "❌ Lawyer Agora client, data, or token not available",
+        agoraData
+      );
       return;
     }
 
@@ -264,13 +283,13 @@ const Livechat = () => {
 
       // Always create audio track for both call and video
       localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({
-        encoderConfig: "music_standard"
+        encoderConfig: "music_standard",
       });
 
       // Create video track only for video calls
       if (currentCall?.mode === "video") {
         localVideoTrack = await AgoraRTC.createCameraVideoTrack({
-          encoderConfig: "1080p_1"
+          encoderConfig: "1080p_1",
         });
       }
 
@@ -316,7 +335,7 @@ const Livechat = () => {
   const leaveChannel = async () => {
     try {
       console.log("🔄 Lawyer leaving Agora channel...");
-      
+
       // Stop and close all local tracks
       localTracks.forEach((track) => {
         if (track && track.stop) {
@@ -345,23 +364,23 @@ const Livechat = () => {
 
   const getStatusBadge = () => {
     const statusMap = {
-      connecting: { variant: 'warning', text: 'Connecting...' },
-      connected: { variant: 'success', text: 'Connected' },
-      disconnected: { variant: 'danger', text: 'Disconnected' },
-      error: { variant: 'danger', text: 'Connection Error' },
+      connecting: { variant: "warning", text: "Connecting..." },
+      connected: { variant: "success", text: "Connected" },
+      disconnected: { variant: "danger", text: "Disconnected" },
+      error: { variant: "danger", text: "Connection Error" },
     };
     const status = statusMap[connectionStatus] || statusMap.disconnected;
     return <Badge bg={status.variant}>{status.text}</Badge>;
   };
 
   const handleAcceptCall = async (call) => {
-    console.log('✅ Accepting call:', call);
-    
+    console.log("✅ Accepting call:", call);
+
     try {
       // Update booking status first
-      const token = sessionStorage.getItem('token');
+      const token = sessionStorage.getItem("token");
       const res = await fetch(
-        `http://localhost:4000/lawapi/common/bookings/${call.bookingId}`,
+        `https://finallawyerwithagora.onrender.com/lawapi/common/bookings/${call.bookingId}`,
         {
           method: "PUT",
           headers: {
@@ -373,20 +392,22 @@ const Livechat = () => {
       );
 
       if (res.ok) {
-        console.log('✅ Booking accepted successfully');
-        
+        console.log("✅ Booking accepted successfully");
+
         // Emit booking accepted event
-        socketRef.current.emit('booking-accepted', {
+        socketRef.current.emit("booking-accepted", {
           bookingId: call.bookingId,
           lawyerId: call.lawyerId,
-          userId: call.user?.id || call.userId || 'unknown',
-          duration: call.duration || 900
+          userId: call.user?.id || call.userId || "unknown",
+          duration: call.duration || 900,
         });
-        
+
         setCurrentCall(call);
         setShowCallModal(true);
-        setIncomingCalls(prev => prev.filter(c => c.bookingId !== call.bookingId));
-        
+        setIncomingCalls((prev) =>
+          prev.filter((c) => c.bookingId !== call.bookingId)
+        );
+
         // If we have Agora credentials, join the channel
         if (call.agora) {
           setTimeout(() => {
@@ -394,38 +415,42 @@ const Livechat = () => {
           }, 1000);
         }
       } else {
-        console.error('❌ Failed to accept booking');
-        alert('Failed to accept the call. Please try again.');
+        console.error("❌ Failed to accept booking");
+        alert("Failed to accept the call. Please try again.");
       }
     } catch (error) {
-      console.error('❌ Error accepting call:', error);
-      alert('Error accepting the call. Please try again.');
+      console.error("❌ Error accepting call:", error);
+      alert("Error accepting the call. Please try again.");
     }
   };
 
   const handleRejectCall = (call) => {
-    console.log('❌ Rejecting call:', call);
-    
-    socketRef.current.emit('call-status', {
+    console.log("❌ Rejecting call:", call);
+
+    socketRef.current.emit("call-status", {
       bookingId: call.bookingId,
-      status: 'rejected',
-      lawyerId: call.lawyerId
+      status: "rejected",
+      lawyerId: call.lawyerId,
     });
-    
-    setIncomingCalls(prev => prev.filter(c => c.bookingId !== call.bookingId));
+
+    setIncomingCalls((prev) =>
+      prev.filter((c) => c.bookingId !== call.bookingId)
+    );
   };
 
   const handleEndCall = () => {
     if (currentCall) {
-      console.log('📴 Ending call:', currentCall);
-      
-      socketRef.current.emit('call-status', {
+      console.log("📴 Ending call:", currentCall);
+
+      socketRef.current.emit("call-status", {
         bookingId: currentCall.bookingId,
-        status: 'ended',
-        lawyerId: currentCall.lawyerId
+        status: "ended",
+        lawyerId: currentCall.lawyerId,
       });
-      
-      setActiveCalls(prev => prev.filter(c => c.bookingId !== currentCall.bookingId));
+
+      setActiveCalls((prev) =>
+        prev.filter((c) => c.bookingId !== currentCall.bookingId)
+      );
       setCurrentCall(null);
       setShowCallModal(false);
       leaveChannel();
@@ -434,96 +459,120 @@ const Livechat = () => {
 
   const CopyToClipboard = ({ text }) => {
     const [copied, setCopied] = useState(false);
-    
+
     const handleCopy = () => {
       navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     };
-    
+
     return (
       <Button variant="outline-secondary" size="sm" onClick={handleCopy}>
-        {copied ? 'Copied!' : 'Copy'}
+        {copied ? "Copied!" : "Copy"}
       </Button>
     );
   };
 
   const CallModal = () => {
     if (!currentCall) return null;
-    
-    const isVideo = currentCall.mode === 'video';
-    const isAudio = currentCall.mode === 'call';
-    const userName = currentCall.user?.name || 'Client';
-    
+
+    const isVideo = currentCall.mode === "video";
+    const isAudio = currentCall.mode === "call";
+    const userName = currentCall.user?.name || "Client";
+
     return (
-      <Modal show={showCallModal} onHide={() => setShowCallModal(false)} centered size="lg">
-        <Modal.Header closeButton style={{ background: isVideo ? '#dc3545' : '#0d6efd', color: 'white' }}>
+      <Modal
+        show={showCallModal}
+        onHide={() => setShowCallModal(false)}
+        centered
+        size="lg"
+      >
+        <Modal.Header
+          closeButton
+          style={{
+            background: isVideo ? "#dc3545" : "#0d6efd",
+            color: "white",
+          }}
+        >
           <Modal.Title>
-            <i className={`fas ${isVideo ? 'fa-video' : 'fa-phone'} me-2`}></i>
-            {isVideo ? 'Video' : 'Audio'} Call with {userName}
+            <i className={`fas ${isVideo ? "fa-video" : "fa-phone"} me-2`}></i>
+            {isVideo ? "Video" : "Audio"} Call with {userName}
             {callStatus && (
-              <span className="badge bg-light text-dark ms-2">{callStatus}</span>
+              <span className="badge bg-light text-dark ms-2">
+                {callStatus}
+              </span>
             )}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body className="text-center">
           <div className="mb-4">
             <div className="position-relative">
-              <div style={{ 
-                width: '100%', 
-                height: isVideo ? '300px' : '150px', 
-                backgroundColor: '#f8f9fa',
-                borderRadius: '10px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                overflow: 'hidden'
-              }}>
+              <div
+                style={{
+                  width: "100%",
+                  height: isVideo ? "300px" : "150px",
+                  backgroundColor: "#f8f9fa",
+                  borderRadius: "10px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
+                }}
+              >
                 {isVideo ? (
-                  <div style={{ width: '100%', height: '100%' }}>
+                  <div style={{ width: "100%", height: "100%" }}>
                     {/* Remote video */}
-                    <div id="lawyer-remote-video" style={{ width: '100%', height: '100%' }}>
+                    <div
+                      id="lawyer-remote-video"
+                      style={{ width: "100%", height: "100%" }}
+                    >
                       {Object.keys(remoteUsers).length === 0 ? (
                         <div className="text-muted">Waiting for client...</div>
                       ) : null}
                     </div>
-                    
+
                     {/* Local video preview */}
                     <div
                       style={{
-                        position: 'absolute',
+                        position: "absolute",
                         bottom: 10,
                         right: 10,
                         width: 100,
                         height: 75,
                         borderRadius: 8,
-                        overflow: 'hidden',
-                        border: '2px solid white',
+                        overflow: "hidden",
+                        border: "2px solid white",
                         zIndex: 10,
                       }}
                     >
-                      <div id="lawyer-local-video" style={{ width: '100%', height: '100%' }}></div>
+                      <div
+                        id="lawyer-local-video"
+                        style={{ width: "100%", height: "100%" }}
+                      ></div>
                     </div>
                   </div>
                 ) : (
                   <div>
                     <i className="fas fa-user fa-4x text-secondary"></i>
                     <div className="mt-2">{userName}</div>
-                    {callStatus && <div className="mt-2 text-muted">{callStatus}</div>}
+                    {callStatus && (
+                      <div className="mt-2 text-muted">{callStatus}</div>
+                    )}
                   </div>
                 )}
               </div>
             </div>
           </div>
-          
+
           {agoraCredentials && (
             <Alert variant="info" className="small">
               <strong>Agora Channel:</strong> {agoraCredentials.channelName}
               <CopyToClipboard text={agoraCredentials.channelName} />
-              <br/>
-              <strong>Token:</strong> {agoraCredentials.token.substring(0, 20)}...
+              <br />
+              <strong>Token:</strong> {agoraCredentials.token.substring(0, 20)}
+              ...
               <CopyToClipboard text={agoraCredentials.token} />
-              <br/>
+              <br />
               <strong>UID:</strong> {agoraCredentials.uid}
               <CopyToClipboard text={agoraCredentials.uid} />
             </Alert>
@@ -540,7 +589,7 @@ const Livechat = () => {
 
   // Safe user name getter function
   const getUserName = (call) => {
-    return call.user?.name || 'Unknown Client';
+    return call.user?.name || "Unknown Client";
   };
 
   return (
@@ -560,7 +609,8 @@ const Livechat = () => {
       <div className="row">
         <div className="col-md-8">
           <Alert variant="info">
-            You will receive live notifications for new consultation requests here.
+            You will receive live notifications for new consultation requests
+            here.
           </Alert>
 
           <div className="row">
@@ -582,7 +632,7 @@ const Livechat = () => {
                           <div className="d-flex justify-content-between align-items-center">
                             <div>
                               <h6 className="mb-1">
-                                {call.mode === 'video' ? (
+                                {call.mode === "video" ? (
                                   <i className="fas fa-video text-danger me-2"></i>
                                 ) : (
                                   <i className="fas fa-phone text-primary me-2"></i>
@@ -590,20 +640,21 @@ const Livechat = () => {
                                 {getUserName(call)}
                               </h6>
                               <small className="text-muted">
-                                {call.mode} consultation • {new Date(call.timestamp).toLocaleTimeString()}
+                                {call.mode} consultation •{" "}
+                                {new Date(call.timestamp).toLocaleTimeString()}
                               </small>
                             </div>
                             <div>
-                              <Button 
-                                size="sm" 
-                                variant="success" 
+                              <Button
+                                size="sm"
+                                variant="success"
                                 className="me-2"
                                 onClick={() => handleAcceptCall(call)}
                               >
                                 <i className="fas fa-check"></i>
                               </Button>
-                              <Button 
-                                size="sm" 
+                              <Button
+                                size="sm"
                                 variant="danger"
                                 onClick={() => handleRejectCall(call)}
                               >
@@ -637,9 +688,9 @@ const Livechat = () => {
                           <div className="d-flex justify-content-between align-items-center">
                             <div>
                               <h6 className="mb-1">
-                                {call.mode === 'video' ? (
+                                {call.mode === "video" ? (
                                   <i className="fas fa-video text-danger me-2"></i>
-                                ) : call.mode === 'call' ? (
+                                ) : call.mode === "call" ? (
                                   <i className="fas fa-phone text-primary me-2"></i>
                                 ) : (
                                   <i className="fas fa-comment text-success me-2"></i>
@@ -647,7 +698,10 @@ const Livechat = () => {
                                 {getUserName(call)}
                               </h6>
                               <small className="text-muted">
-                                {call.mode} session • Started {new Date(call.startedAt || call.timestamp).toLocaleTimeString()}
+                                {call.mode} session • Started{" "}
+                                {new Date(
+                                  call.startedAt || call.timestamp
+                                ).toLocaleTimeString()}
                               </small>
                             </div>
                             <Badge bg="success">Active</Badge>
@@ -668,7 +722,7 @@ const Livechat = () => {
               <i className="fas fa-code me-2"></i>
               API Responses & Tokens
             </Card.Header>
-            <Card.Body style={{ maxHeight: '400px', overflowY: 'auto' }}>
+            <Card.Body style={{ maxHeight: "400px", overflowY: "auto" }}>
               {apiResponses.length === 0 ? (
                 <div className="text-center text-muted p-3">
                   No API responses yet
@@ -678,10 +732,16 @@ const Livechat = () => {
                   {apiResponses.map((response, index) => (
                     <div key={index} className="mb-2 p-2 border-bottom">
                       <small>
-                        <strong>{response.endpoint}</strong> 
-                        <span className="text-muted"> at {response.timestamp}</span>
+                        <strong>{response.endpoint}</strong>
+                        <span className="text-muted">
+                          {" "}
+                          at {response.timestamp}
+                        </span>
                       </small>
-                      <pre className="bg-light p-2 mt-1 small" style={{ fontSize: '10px', overflow: 'hidden' }}>
+                      <pre
+                        className="bg-light p-2 mt-1 small"
+                        style={{ fontSize: "10px", overflow: "hidden" }}
+                      >
                         {JSON.stringify(response.data, null, 2)}
                       </pre>
                     </div>

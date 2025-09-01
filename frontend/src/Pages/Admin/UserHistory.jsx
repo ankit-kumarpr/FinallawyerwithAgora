@@ -58,7 +58,7 @@ const UserHistory = () => {
       try {
         setLoading(true);
         const response = await axios.get(
-          "http://localhost:4000/lawapi/common/alluser",
+          "https://finallawyerwithagora.onrender.com/lawapi/common/alluser",
           {
             headers: {
               "Content-Type": "application/json",
@@ -83,7 +83,7 @@ const UserHistory = () => {
       setLoading(true);
       setError(null);
       const response = await axios.get(
-        `http://localhost:4000/lawapi/common/userhistory/${userId}`,
+        `https://finallawyerwithagora.onrender.com/lawapi/common/userhistory/${userId}`,
         {
           headers: {
             "Content-Type": "application/json",
