@@ -12,9 +12,6 @@ const PaymentModal = ({
   lawyer,
   onPaymentSuccess,
 }) => {
-  const [duration, setDuration] = useState(15);
-  const [pricePerMinute, setPricePerMinute] = useState(10);
-  const [total, setTotal] = useState(150);
   const [loading, setLoading] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [sessionToken, setSessionToken] = useState(null);
@@ -52,6 +49,9 @@ const PaymentModal = ({
     },
   };
 
+  // Get total amount directly from lawyer's consultation fee
+  const total = serviceDetails[serviceType]?.price || lawyer?.consultation_fees || 10;
+
   // Initialize Agora client
   useEffect(() => {
     try {
@@ -74,26 +74,47 @@ const PaymentModal = ({
     if (!agoraClient) return;
 
     const handleUserPublished = async (user, mediaType) => {
-      await agoraClient.subscribe(user, mediaType);
+      try {
+        await agoraClient.subscribe(user, mediaType);
+        console.log("✅ User subscribed to remote media:", mediaType, "from user:", user.uid);
 
-      if (mediaType === "video") {
-        const remoteVideoContainer = document.getElementById(
-          "remote-video-container"
-        );
-        if (remoteVideoContainer) {
-          user.videoTrack.play("remote-video-container");
+        if (mediaType === "video") {
+          const remoteVideoContainer = document.getElementById(
+            "remote-video-container"
+          );
+          if (remoteVideoContainer) {
+            // Clear any existing content
+            remoteVideoContainer.innerHTML = '';
+            
+            // Create a new video element for the remote user
+            const videoElement = document.createElement('div');
+            videoElement.id = `remote-video-${user.uid}`;
+            videoElement.style.width = '100%';
+            videoElement.style.height = '100%';
+            remoteVideoContainer.appendChild(videoElement);
+            
+            // Play the remote video
+            user.videoTrack.play(`remote-video-${user.uid}`);
+            console.log("✅ Remote video track playing for user:", user.uid);
+          } else {
+            console.error("❌ Remote video container not found");
+          }
         }
-      }
 
-      if (mediaType === "audio") {
-        user.audioTrack.play();
-        setCallStatus("Connected");
-      }
+        if (mediaType === "audio") {
+          user.audioTrack.play();
+          setCallStatus("Connected");
+          console.log("✅ Remote audio track playing for user:", user.uid);
+        }
 
-      setRemoteUsers((prev) => ({ ...prev, [user.uid]: user }));
+        setRemoteUsers((prev) => ({ ...prev, [user.uid]: user }));
+      } catch (error) {
+        console.error("❌ Error handling user published:", error);
+      }
     };
 
     const handleUserUnpublished = (user) => {
+      console.log("User unpublished:", user.uid);
       setRemoteUsers((prev) => {
         const newUsers = { ...prev };
         delete newUsers[user.uid];
@@ -102,13 +123,13 @@ const PaymentModal = ({
     };
 
     const handleUserJoined = (user) => {
-      console.log("User joined:", user);
+      console.log("User joined:", user.uid);
       setRemoteUsers((prev) => ({ ...prev, [user.uid]: user }));
       setCallStatus("Connected");
     };
 
     const handleUserLeft = (user) => {
-      console.log("User left:", user);
+      console.log("User left:", user.uid);
       setRemoteUsers((prev) => {
         const newUsers = { ...prev };
         delete newUsers[user.uid];
@@ -117,24 +138,50 @@ const PaymentModal = ({
       setCallStatus("Call ended");
     };
 
+    // Add listener for when user publishes their own tracks
+    const handleUserPublish = (user, mediaType) => {
+      console.log("🎯 User published their own track:", mediaType, "UID:", user.uid);
+    };
+
     agoraClient.on("user-published", handleUserPublished);
     agoraClient.on("user-unpublished", handleUserUnpublished);
     agoraClient.on("user-joined", handleUserJoined);
     agoraClient.on("user-left", handleUserLeft);
+    agoraClient.on("user-publish", handleUserPublish);
 
     return () => {
       agoraClient.off("user-published", handleUserPublished);
       agoraClient.off("user-unpublished", handleUserUnpublished);
       agoraClient.off("user-joined", handleUserJoined);
       agoraClient.off("user-left", handleUserLeft);
+      agoraClient.off("user-publish", handleUserPublish);
     };
   }, [agoraClient]);
 
+  // Effect to handle local video display when tracks change
   useEffect(() => {
-    const perMinute = serviceDetails[serviceType]?.price || 10;
-    setPricePerMinute(perMinute);
-    setTotal(duration * perMinute);
-  }, [serviceType, duration]);
+    if (localTracks.length > 0 && serviceType === "video") {
+      const videoTrack = localTracks.find(track => track.trackMediaType === 'video');
+      if (videoTrack) {
+        // Wait for DOM to be ready and then play local video
+        const timer = setTimeout(() => {
+          const localVideoElement = document.getElementById("local-video");
+          if (localVideoElement) {
+            try {
+              videoTrack.play("local-video");
+              console.log("✅ Local video playing from useEffect");
+            } catch (error) {
+              console.error("❌ Error playing local video:", error);
+            }
+          } else {
+            console.error("❌ Local video element not found in useEffect");
+          }
+        }, 1000);
+
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [localTracks, serviceType]);
 
   useEffect(() => {
     setInternalShow(show);
@@ -156,16 +203,39 @@ const PaymentModal = ({
     }
 
     try {
+      console.log("🎯 Starting to join Agora channel:", {
+        appId: agoraData.appId,
+        channelName: agoraData.channelName,
+        uid: agoraData.uid,
+        serviceType
+      });
+
       // Create local tracks based on call type
       let localAudioTrack = null;
       let localVideoTrack = null;
 
       // Always create audio track for both call and video
-      localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+      try {
+        localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+        console.log("✅ Audio track created successfully");
+      } catch (audioError) {
+        console.error("❌ Failed to create audio track:", audioError);
+        throw new Error("Failed to access microphone");
+      }
 
       // Create video track only for video calls
       if (serviceType === "video") {
-        localVideoTrack = await AgoraRTC.createCameraVideoTrack();
+        try {
+          localVideoTrack = await AgoraRTC.createCameraVideoTrack({
+            encoderConfig: "1080p_1",
+          });
+          console.log("✅ Video track created successfully");
+        } catch (videoError) {
+          console.error("❌ Failed to create video track:", videoError);
+          // Fallback to audio-only if video fails
+          localVideoTrack = null;
+          alert("Video camera access failed. Continuing with audio only.");
+        }
       }
 
       // Join the channel
@@ -182,27 +252,39 @@ const PaymentModal = ({
 
       // Publish tracks based on call type
       if (serviceType === "video" && localVideoTrack) {
+        // Publish both audio and video tracks
         await agoraClient.publish([localAudioTrack, localVideoTrack]);
+        console.log("✅ Video tracks published successfully");
 
-        // Play local video
-        const localVideoElement = document.getElementById("local-video");
-        if (localVideoElement) {
-          localVideoTrack.play("local-video");
-        }
+        // Play local video - IMPORTANT: Wait for DOM to be ready
+        setTimeout(() => {
+          const localVideoElement = document.getElementById("local-video");
+          if (localVideoElement) {
+            localVideoTrack.play("local-video");
+            console.log("✅ Local video playing");
+          } else {
+            console.error("❌ Local video element not found");
+          }
+        }, 500);
+
       } else {
         // For audio calls, publish only audio
         await agoraClient.publish([localAudioTrack]);
+        console.log("✅ Audio track published");
       }
 
       // Store local tracks for cleanup
-      setLocalTracks(
-        [localAudioTrack, localVideoTrack].filter((track) => track !== null)
-      );
+      const tracks = [localAudioTrack, localVideoTrack].filter((track) => track !== null);
+      setLocalTracks(tracks);
+      console.log(`✅ Published ${tracks.length} tracks`);
 
-      console.log("✅ User published tracks");
+      // Update call status
+      setCallStatus("Waiting for lawyer to join...");
+
     } catch (error) {
       console.error("❌ User failed to join channel:", error);
       setCallStatus("Connection failed");
+      alert(`Failed to join call: ${error.message}`);
     }
   };
 
@@ -211,8 +293,12 @@ const PaymentModal = ({
     try {
       // Stop and close all local tracks
       localTracks.forEach((track) => {
-        track.stop();
-        track.close();
+        if (track && track.stop) {
+          track.stop();
+        }
+        if (track && track.close) {
+          track.close();
+        }
       });
 
       setLocalTracks([]);
@@ -228,6 +314,41 @@ const PaymentModal = ({
     } catch (error) {
       console.error("❌ User failed to leave channel:", error);
     }
+  };
+
+  // Handle mute/unmute audio
+  const toggleAudio = () => {
+    if (localTracks.length > 0) {
+      const audioTrack = localTracks.find(track => track.trackMediaType === 'audio');
+      if (audioTrack) {
+        const newState = !audioTrack.enabled;
+        audioTrack.setEnabled(newState);
+        console.log(`🎤 Audio ${newState ? 'enabled' : 'disabled'}`);
+      }
+    }
+  };
+
+  // Handle video on/off
+  const toggleVideo = () => {
+    if (localTracks.length > 0) {
+      const videoTrack = localTracks.find(track => track.trackMediaType === 'video');
+      if (videoTrack) {
+        const newState = !videoTrack.enabled;
+        videoTrack.setEnabled(newState);
+        console.log(`📹 Video ${newState ? 'enabled' : 'disabled'}`);
+      }
+    }
+  };
+
+  // Get current audio/video states
+  const getAudioState = () => {
+    const audioTrack = localTracks.find(track => track.trackMediaType === 'audio');
+    return audioTrack ? audioTrack.enabled : true;
+  };
+
+  const getVideoState = () => {
+    const videoTrack = localTracks.find(track => track.trackMediaType === 'video');
+    return videoTrack ? videoTrack.enabled : true;
   };
 
   const handlePaymentSuccess = async (response) => {
@@ -352,11 +473,30 @@ const PaymentModal = ({
         if (onPaymentSuccess) {
           onPaymentSuccess({
             sessionToken: token,
-            durationMinutes: duration,
+            durationMinutes: 15, // Fixed duration for all sessions
             paymentId: razorpay_payment_id,
             bookingId,
             agora: verifyData.agora || null,
           });
+        }
+
+        // Show success message and automatically proceed to video call
+        if (serviceType === "video" || serviceType === "call") {
+          // Don't close the modal, let it show the video call UI
+          console.log("🎉 Payment successful! Video call UI will appear automatically.");
+          
+          // Show success notification
+          if (window.Swal) {
+            window.Swal.fire({
+              icon: "success",
+              title: "Payment Successful!",
+              text: "Starting video call...",
+              timer: 2000,
+              showConfirmButton: false,
+              toast: true,
+              position: "top-end"
+            });
+          }
         }
       } else {
         alert(`Payment verification failed: ${verifyData.message}`);
@@ -384,7 +524,7 @@ const PaymentModal = ({
           body: JSON.stringify({
             lawyerId: lawyer?.lawyerId,
             mode: serviceType,
-            amount: total * 100,
+            amount: total * 100, // Convert to paise
           }),
         }
       );
@@ -400,10 +540,10 @@ const PaymentModal = ({
 
       const options = {
         key: "rzp_test_mcwl3oaRQerrOW",
-        amount: total * 100,
+        amount: total * 100, // Convert to paise
         currency: "INR",
         name: `${service.name} with ${lawyer?.name}`,
-        description: `${service.name} consultation (${duration} mins)`,
+        description: `${service.name} consultation`,
         image: "/logo.png",
         order_id: razorpayOrderId,
         handler: (response) => handlePaymentSuccess({ ...response, bookingId }),
@@ -415,7 +555,6 @@ const PaymentModal = ({
         notes: {
           lawyerId: lawyer?.lawyerId || "Unknown",
           service: serviceType,
-          duration,
           lawyerName: lawyer?.name || "Unknown",
         },
         theme: { color: service.color },
@@ -477,6 +616,7 @@ const PaymentModal = ({
                     <div>
                       <i className="fas fa-user fa-5x mb-3"></i>
                       <p>{callStatus}</p>
+                      <small>Waiting for lawyer to join...</small>
                     </div>
                   </div>
                 )}
@@ -484,26 +624,81 @@ const PaymentModal = ({
             </div>
 
             {/* Local video preview */}
-            {serviceType === "video" && (
+            <div
+              style={{
+                position: "absolute",
+                bottom: 20,
+                right: 20,
+                width: 150,
+                height: 100,
+                borderRadius: 8,
+                overflow: "hidden",
+                zIndex: 10,
+                border: "2px solid white",
+                backgroundColor: "#000",
+              }}
+            >
               <div
-                style={{
-                  position: "absolute",
-                  bottom: 20,
-                  right: 20,
-                  width: 150,
-                  height: 100,
-                  borderRadius: 8,
-                  overflow: "hidden",
-                  zIndex: 10,
-                  border: "2px solid white",
-                }}
-              >
-                <div
-                  id="local-video"
-                  style={{ width: "100%", height: "100%" }}
-                ></div>
+                id="local-video"
+                style={{ width: "100%", height: "100%" }}
+              ></div>
+            </div>
+
+            {/* Call controls overlay */}
+            <div
+              style={{
+                position: "absolute",
+                bottom: 20,
+                left: "50%",
+                transform: "translateX(-50%)",
+                zIndex: 10,
+              }}
+            >
+              <div className="d-flex gap-2">
+                <Button
+                  variant={getAudioState() ? "outline-light" : "danger"}
+                  size="lg"
+                  style={{ borderRadius: "50%", width: "60px", height: "60px" }}
+                  onClick={toggleAudio}
+                >
+                  <i className={`fas fa-microphone${getAudioState() ? '' : '-slash'}`}></i>
+                </Button>
+                <Button
+                  variant={getVideoState() ? "outline-light" : "danger"}
+                  size="lg"
+                  style={{ borderRadius: "50%", width: "60px", height: "60px" }}
+                  onClick={toggleVideo}
+                >
+                  <i className={`fas fa-video${getVideoState() ? '' : '-slash'}`}></i>
+                </Button>
               </div>
-            )}
+            </div>
+
+            {/* Debug info overlay */}
+            <div
+              style={{
+                position: "absolute",
+                top: 20,
+                right: 20,
+                zIndex: 10,
+                background: "rgba(0,0,0,0.7)",
+                color: "white",
+                padding: "10px",
+                borderRadius: "8px",
+                fontSize: "12px",
+                maxWidth: "300px",
+              }}
+            >
+              <div><strong>Debug Info:</strong></div>
+              <div>Status: {callStatus}</div>
+              <div>Local Tracks: {localTracks.length}</div>
+              <div>Remote Users: {Object.keys(remoteUsers).length}</div>
+              <div>Audio: {getAudioState() ? 'ON' : 'OFF'}</div>
+              <div>Video: {getVideoState() ? 'ON' : 'OFF'}</div>
+              {Object.keys(remoteUsers).map(uid => (
+                <div key={uid}>Remote User: {uid}</div>
+              ))}
+            </div>
           </div>
         </Modal.Body>
         <Modal.Footer style={{ background: "#f8f9fa" }}>
@@ -601,11 +796,10 @@ const PaymentModal = ({
           {sessionToken &&
           bookingId &&
           lawyer &&
-          duration &&
           currentUser?._id ? (
             <ChatBox
               sessionToken={sessionToken}
-              chatDuration={duration}
+              chatDuration={15} // Fixed duration
               lawyer={lawyer}
               bookingId={bookingId}
               role="client"
@@ -663,49 +857,37 @@ const PaymentModal = ({
           <p className="text-muted">{lawyer?.specialization}</p>
         </div>
 
-        <Form>
-          <Form.Group controlId="duration" className="mb-4">
-            <Form.Label>Duration</Form.Label>
-            <Form.Select
-              value={duration}
-              onChange={(e) => setDuration(Number(e.target.value))}
-              style={{ borderRadius: "20px", padding: "10px" }}
-            >
-              <option value={15}>15 minutes</option>
-              <option value={30}>30 minutes</option>
-              <option value={45}>45 minutes</option>
-              <option value={60}>60 minutes</option>
-            </Form.Select>
-          </Form.Group>
-
-          <div
-            className="p-4 mb-3"
-            style={{
-              background: "#f8f9fa",
-              borderRadius: "10px",
-              borderLeft: `4px solid ${serviceDetails[serviceType]?.color}`,
-            }}
-          >
-            <div className="d-flex justify-content-between mb-2">
-              <span className="text-muted">Rate:</span>
-              <span>₹{pricePerMinute} per minute</span>
-            </div>
-            <div className="d-flex justify-content-between mb-2">
-              <span className="text-muted">Duration:</span>
-              <span>{duration} minutes</span>
-            </div>
-            <hr />
-            <div className="d-flex justify-content-between">
-              <strong>Total Amount:</strong>
-              <strong
-                className="h5"
-                style={{ color: serviceDetails[serviceType]?.color }}
-              >
-                ₹{total}
-              </strong>
-            </div>
+        <div
+          className="p-4 mb-3"
+          style={{
+            background: "#f8f9fa",
+            borderRadius: "10px",
+            borderLeft: `4px solid ${serviceDetails[serviceType]?.color}`,
+          }}
+        >
+          <div className="d-flex justify-content-between mb-2">
+            <span className="text-muted">Service:</span>
+            <span>{serviceDetails[serviceType]?.name}</span>
           </div>
-        </Form>
+          <div className="d-flex justify-content-between mb-2">
+            <span className="text-muted">Lawyer:</span>
+            <span>{lawyer?.name}</span>
+          </div>
+          <div className="d-flex justify-content-between mb-2">
+            <span className="text-muted">Specialization:</span>
+            <span>{lawyer?.specialization}</span>
+          </div>
+          <hr />
+          <div className="d-flex justify-content-between">
+            <strong>Total Amount:</strong>
+            <strong
+              className="h5"
+              style={{ color: serviceDetails[serviceType]?.color }}
+            >
+              ₹{total}
+            </strong>
+          </div>
+        </div>
       </Modal.Body>
       <Modal.Footer>
         <Button

@@ -52,20 +52,35 @@ const Livechat = () => {
     const handleUserPublished = async (user, mediaType) => {
       try {
         await agoraClient.subscribe(user, mediaType);
-        console.log("✅ Lawyer subscribed to user media:", mediaType);
+        console.log("✅ Lawyer subscribed to user media:", mediaType, "from user:", user.uid);
 
         if (mediaType === "video") {
           const remoteVideoContainer = document.getElementById(
             "lawyer-remote-video"
           );
           if (remoteVideoContainer) {
-            user.videoTrack.play("lawyer-remote-video");
+            // Clear any existing content
+            remoteVideoContainer.innerHTML = '';
+            
+            // Create a new video element for the remote user
+            const videoElement = document.createElement('div');
+            videoElement.id = `lawyer-remote-video-${user.uid}`;
+            videoElement.style.width = '100%';
+            videoElement.style.height = '100%';
+            remoteVideoContainer.appendChild(videoElement);
+            
+            // Play the remote video
+            user.videoTrack.play(`lawyer-remote-video-${user.uid}`);
+            console.log("✅ Lawyer remote video track playing for user:", user.uid);
+          } else {
+            console.error("❌ Lawyer remote video container not found");
           }
         }
 
         if (mediaType === "audio") {
           user.audioTrack.play();
           setCallStatus("Connected");
+          console.log("✅ Lawyer remote audio track playing for user:", user.uid);
         }
 
         setRemoteUsers((prev) => ({ ...prev, [user.uid]: user }));
@@ -75,7 +90,7 @@ const Livechat = () => {
     };
 
     const handleUserUnpublished = (user) => {
-      console.log("User unpublished:", user);
+      console.log("User unpublished:", user.uid);
       setRemoteUsers((prev) => {
         const newUsers = { ...prev };
         delete newUsers[user.uid];
@@ -84,13 +99,13 @@ const Livechat = () => {
     };
 
     const handleUserJoined = (user) => {
-      console.log("User joined:", user);
+      console.log("User joined:", user.uid);
       setRemoteUsers((prev) => ({ ...prev, [user.uid]: user }));
       setCallStatus("Connected");
     };
 
     const handleUserLeft = (user) => {
-      console.log("User left:", user);
+      console.log("User left:", user.uid);
       setRemoteUsers((prev) => {
         const newUsers = { ...prev };
         delete newUsers[user.uid];
@@ -112,6 +127,37 @@ const Livechat = () => {
       agoraClient.off("user-left", handleUserLeft);
     };
   }, [agoraClient]);
+
+  // Effect to handle remote video display when remote users change
+  useEffect(() => {
+    if (Object.keys(remoteUsers).length > 0) {
+      console.log("🔍 Remote users updated:", Object.keys(remoteUsers));
+      
+      // Force re-render of remote video
+      const remoteVideoContainer = document.getElementById("lawyer-remote-video");
+      if (remoteVideoContainer) {
+        // Clear and recreate video elements
+        remoteVideoContainer.innerHTML = '';
+        
+        Object.values(remoteUsers).forEach(user => {
+          if (user.videoTrack) {
+            const videoElement = document.createElement('div');
+            videoElement.id = `lawyer-remote-video-${user.uid}`;
+            videoElement.style.width = '100%';
+            videoElement.style.height = '100%';
+            remoteVideoContainer.appendChild(videoElement);
+            
+            try {
+              user.videoTrack.play(`lawyer-remote-video-${user.uid}`);
+              console.log("✅ Recreated remote video for user:", user.uid);
+            } catch (error) {
+              console.error("❌ Error playing remote video:", error);
+            }
+          }
+        });
+      }
+    }
+  }, [remoteUsers]);
 
   useEffect(() => {
     const socket = getSocket();
@@ -275,6 +321,13 @@ const Livechat = () => {
     }
 
     try {
+      console.log("🎯 Lawyer starting to join Agora channel:", {
+        appId: agoraData.appId,
+        channelName: agoraData.channelName,
+        uid: agoraData.uid,
+        mode: currentCall?.mode
+      });
+
       setCallStatus("Connecting...");
 
       // Create local tracks based on call type
@@ -282,15 +335,29 @@ const Livechat = () => {
       let localVideoTrack = null;
 
       // Always create audio track for both call and video
-      localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({
-        encoderConfig: "music_standard",
-      });
+      try {
+        localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack({
+          encoderConfig: "music_standard",
+        });
+        console.log("✅ Lawyer audio track created successfully");
+      } catch (audioError) {
+        console.error("❌ Failed to create lawyer audio track:", audioError);
+        throw new Error("Failed to access microphone");
+      }
 
       // Create video track only for video calls
       if (currentCall?.mode === "video") {
-        localVideoTrack = await AgoraRTC.createCameraVideoTrack({
-          encoderConfig: "1080p_1",
-        });
+        try {
+          localVideoTrack = await AgoraRTC.createCameraVideoTrack({
+            encoderConfig: "1080p_1",
+          });
+          console.log("✅ Lawyer video track created successfully");
+        } catch (videoError) {
+          console.error("❌ Failed to create lawyer video track:", videoError);
+          // Fallback to audio-only if video fails
+          localVideoTrack = null;
+          alert("Video camera access failed. Continuing with audio only.");
+        }
       }
 
       // Join the channel
@@ -313,21 +380,23 @@ const Livechat = () => {
         const localVideoElement = document.getElementById("lawyer-local-video");
         if (localVideoElement) {
           localVideoTrack.play("lawyer-local-video");
+          console.log("✅ Lawyer local video playing");
         }
       } else {
         // For audio calls, publish only audio
         await agoraClient.publish([localAudioTrack]);
+        console.log("✅ Lawyer audio track published");
       }
 
       // Store local tracks for cleanup
-      setLocalTracks(
-        [localAudioTrack, localVideoTrack].filter((track) => track !== null)
-      );
+      const tracks = [localAudioTrack, localVideoTrack].filter((track) => track !== null);
+      setLocalTracks(tracks);
+      console.log(`✅ Lawyer published ${tracks.length} tracks`);
 
-      console.log("✅ Lawyer published tracks");
     } catch (error) {
       console.error("❌ Lawyer failed to join channel:", error);
       setCallStatus("Connection failed");
+      alert(`Failed to join call: ${error.message}`);
     }
   };
 
@@ -360,6 +429,41 @@ const Livechat = () => {
     } catch (error) {
       console.error("❌ Lawyer failed to leave channel:", error);
     }
+  };
+
+  // Handle mute/unmute audio
+  const toggleAudio = () => {
+    if (localTracks.length > 0) {
+      const audioTrack = localTracks.find(track => track.trackMediaType === 'audio');
+      if (audioTrack) {
+        const newState = !audioTrack.enabled;
+        audioTrack.setEnabled(newState);
+        console.log(`🎤 Lawyer audio ${newState ? 'enabled' : 'disabled'}`);
+      }
+    }
+  };
+
+  // Handle video on/off
+  const toggleVideo = () => {
+    if (localTracks.length > 0) {
+      const videoTrack = localTracks.find(track => track.trackMediaType === 'video');
+      if (videoTrack) {
+        const newState = !videoTrack.enabled;
+        videoTrack.setEnabled(newState);
+        console.log(`📹 Lawyer video ${newState ? 'enabled' : 'disabled'}`);
+      }
+    }
+  };
+
+  // Get current audio/video states
+  const getAudioState = () => {
+    const audioTrack = localTracks.find(track => track.trackMediaType === 'audio');
+    return audioTrack ? audioTrack.enabled : true;
+  };
+
+  const getVideoState = () => {
+    const videoTrack = localTracks.find(track => track.trackMediaType === 'video');
+    return videoTrack ? videoTrack.enabled : true;
   };
 
   const getStatusBadge = () => {
@@ -510,7 +614,7 @@ const Livechat = () => {
               <div
                 style={{
                   width: "100%",
-                  height: isVideo ? "300px" : "150px",
+                  height: isVideo ? "400px" : "150px",
                   backgroundColor: "#f8f9fa",
                   borderRadius: "10px",
                   display: "flex",
@@ -520,15 +624,24 @@ const Livechat = () => {
                 }}
               >
                 {isVideo ? (
-                  <div style={{ width: "100%", height: "100%" }}>
+                  <div style={{ width: "100%", height: "100%", position: "relative" }}>
                     {/* Remote video */}
                     <div
                       id="lawyer-remote-video"
                       style={{ width: "100%", height: "100%" }}
                     >
                       {Object.keys(remoteUsers).length === 0 ? (
-                        <div className="text-muted">Waiting for client...</div>
-                      ) : null}
+                        <div className="text-muted d-flex flex-column align-items-center justify-content-center h-100">
+                          <i className="fas fa-user fa-3x mb-2"></i>
+                          <div>Waiting for client...</div>
+                          <small className="mt-2">Client will appear here when they join</small>
+                        </div>
+                      ) : (
+                        <div className="text-success text-center p-2">
+                          <i className="fas fa-check-circle me-2"></i>
+                          Client connected ({Object.keys(remoteUsers).length} user{Object.keys(remoteUsers).length > 1 ? 's' : ''})
+                        </div>
+                      )}
                     </div>
 
                     {/* Local video preview */}
@@ -537,18 +650,92 @@ const Livechat = () => {
                         position: "absolute",
                         bottom: 10,
                         right: 10,
-                        width: 100,
-                        height: 75,
+                        width: 120,
+                        height: 90,
                         borderRadius: 8,
                         overflow: "hidden",
                         border: "2px solid white",
                         zIndex: 10,
+                        backgroundColor: "#000",
                       }}
                     >
                       <div
                         id="lawyer-local-video"
                         style={{ width: "100%", height: "100%" }}
                       ></div>
+                    </div>
+
+                    {/* Call controls overlay */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        bottom: 10,
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        zIndex: 10,
+                      }}
+                    >
+                      <div className="d-flex gap-2">
+                        <Button
+                          variant={getAudioState() ? "outline-light" : "danger"}
+                          size="sm"
+                          style={{ borderRadius: "50%", width: "40px", height: "40px" }}
+                          onClick={toggleAudio}
+                        >
+                          <i className={`fas fa-microphone${getAudioState() ? '' : '-slash'}`}></i>
+                        </Button>
+                        <Button
+                          variant={getVideoState() ? "outline-light" : "danger"}
+                          size="sm"
+                          style={{ borderRadius: "50%", width: "40px", height: "40px" }}
+                          onClick={toggleVideo}
+                        >
+                          <i className={`fas fa-video${getVideoState() ? '' : '-slash'}`}></i>
+                        </Button>
+                        <Button
+                          variant="outline-warning"
+                          size="sm"
+                          style={{ borderRadius: "50%", width: "40px", height: "40px" }}
+                          onClick={refreshVideoDisplay}
+                          title="Refresh Video Display"
+                        >
+                          <i className="fas fa-sync-alt"></i>
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Debug info overlay */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 10,
+                        right: 10,
+                        zIndex: 10,
+                        background: "rgba(0,0,0,0.7)",
+                        color: "white",
+                        padding: "8px",
+                        borderRadius: "6px",
+                        fontSize: "11px",
+                        maxWidth: "280px",
+                      }}
+                    >
+                      <div><strong>Debug Info:</strong></div>
+                      <div>Status: {callStatus}</div>
+                      <div>Local Tracks: {localTracks.length}</div>
+                      <div>Remote Users: {Object.keys(remoteUsers).length}</div>
+                      <div>Audio: {getAudioState() ? 'ON' : 'OFF'}</div>
+                      <div>Video: {getVideoState() ? 'ON' : 'OFF'}</div>
+                      <div>Channel: {agoraCredentials?.channelName || 'N/A'}</div>
+                      {Object.keys(remoteUsers).map(uid => {
+                        const user = remoteUsers[uid];
+                        return (
+                          <div key={uid} className="mt-1">
+                            <div>User: {uid}</div>
+                            <div>Video: {user.videoTrack ? '✅' : '❌'}</div>
+                            <div>Audio: {user.audioTrack ? '✅' : '❌'}</div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 ) : (
@@ -590,6 +777,35 @@ const Livechat = () => {
   // Safe user name getter function
   const getUserName = (call) => {
     return call.user?.name || "Unknown Client";
+  };
+
+  // Test function to manually refresh video display
+  const refreshVideoDisplay = () => {
+    console.log("🔄 Manually refreshing video display...");
+    
+    if (Object.keys(remoteUsers).length > 0) {
+      const remoteVideoContainer = document.getElementById("lawyer-remote-video");
+      if (remoteVideoContainer) {
+        remoteVideoContainer.innerHTML = '';
+        
+        Object.values(remoteUsers).forEach(user => {
+          if (user.videoTrack) {
+            const videoElement = document.createElement('div');
+            videoElement.id = `lawyer-remote-video-${user.uid}`;
+            videoElement.style.width = '100%';
+            videoElement.style.height = '100%';
+            remoteVideoContainer.appendChild(videoElement);
+            
+            try {
+              user.videoTrack.play(`lawyer-remote-video-${user.uid}`);
+              console.log("✅ Manually refreshed video for user:", user.uid);
+            } catch (error) {
+              console.error("❌ Error in manual refresh:", error);
+            }
+          }
+        });
+      }
+    }
   };
 
   return (

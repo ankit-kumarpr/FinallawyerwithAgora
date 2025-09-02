@@ -34,20 +34,23 @@ const LawyerProfileModal = ({ show, handleClose, lawyer }) => {
     setShowPaymentModal(true);
   };
   const handlevideoCall = () => {
-    Swal.fire({
-      icon: "info",
-      title: "Coming Soon",
-      text: "Video call feature is coming soon!",
-      confirmButtonColor: "#1c1c84",
-    });
+    setSelectedService("video");
+    setShowPaymentModal(true);
   };
 
   const handlePaymentSuccess = (paymentResult) => {
+    // For video calls, don't close the modal - let it show the video call UI
+    if (selectedService === "video" || selectedService === "call") {
+      console.log("🎉 Video call payment successful! Modal will stay open for video call UI.");
+      return; // Don't close modal for video calls
+    }
+
+    // For other services, close the modal
     setShowPaymentModal(false);
+    
     if (selectedService === "chat") {
       setActiveSession({
         sessionToken: paymentResult.sessionToken,
-
         duration: paymentResult.durationMinutes,
         lawyer: lawyer,
         bookingId: paymentResult.bookingId,
