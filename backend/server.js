@@ -887,26 +887,37 @@ const activeSessions = new Map();
 
 // Agora token generation function
 const generateAgoraToken = (channelName, uid, role = RtcRole.PUBLISHER, expireTime = 3600) => {
-  const currentTime = Math.floor(Date.now() / 1000);
-  const privilegeExpireTime = currentTime + expireTime;
-  
-  const token = RtcTokenBuilder.buildTokenWithUid(
-    AGORA_APP_ID,
-    AGORA_APP_CERTIFICATE,
-    channelName,
-    uid,
-    role,
-    privilegeExpireTime
-  );
-  
-  return {
-    token,
-    uid: uid.toString(),
-    appId: AGORA_APP_ID,
-    channelName,
-    role: role === RtcRole.PUBLISHER ? "publisher" : "subscriber",
-    expiresAt: new Date(privilegeExpireTime * 1000).toISOString()
-  };
+  try {
+    if (!AGORA_APP_ID || !AGORA_APP_CERTIFICATE) {
+      throw new Error("Agora credentials not configured");
+    }
+
+    const currentTime = Math.floor(Date.now() / 1000);
+    const privilegeExpireTime = currentTime + expireTime;
+    
+    const token = RtcTokenBuilder.buildTokenWithUid(
+      AGORA_APP_ID,
+      AGORA_APP_CERTIFICATE,
+      channelName,
+      uid,
+      role,
+      privilegeExpireTime
+    );
+    
+    console.log(`✅ Generated Agora token for channel: ${channelName}, UID: ${uid}`);
+    
+    return {
+      token,
+      uid: uid.toString(),
+      appId: AGORA_APP_ID,
+      channelName,
+      role: role === RtcRole.PUBLISHER ? "publisher" : "subscriber",
+      expiresAt: new Date(privilegeExpireTime * 1000).toISOString()
+    };
+  } catch (error) {
+    console.error("❌ Failed to generate Agora token:", error);
+    throw error;
+  }
 };
 
 // ===== SOCKET HANDLERS =====
@@ -961,7 +972,7 @@ io.on("connection", (socket) => {
         const channelName = `booking-${bookingId}`;
         const expireTime = 3600; // 1 hour
 
-        // Generate unique UIDs for user and lawyer
+        // Generate unique UIDs for user and lawyer (avoid conflicts)
         const userUid = Math.floor(Math.random() * 100000) + 100000;
         const lawyerUid = Math.floor(Math.random() * 100000) + 200000;
 
@@ -976,11 +987,15 @@ io.on("connection", (socket) => {
         };
 
         // Update booking with Agora data
-        await Booking.findByIdAndUpdate(
-          bookingId,
-          { agora: agoraData },
-          { new: true }
-        );
+        try {
+          await Booking.findByIdAndUpdate(
+            bookingId,
+            { agora: agoraData },
+            { new: true }
+          );
+        } catch (updateError) {
+          console.error("Failed to update booking with Agora data:", updateError);
+        }
 
         console.log(`🎯 Generated Agora tokens for ${mode} call:`, {
           channelName,
@@ -1127,9 +1142,14 @@ io.on("connection", (socket) => {
 // ===== START SERVER =====
 server.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
-  if (AGORA_APP_ID === "your_agora_app_id") {
+  
+  // Validate Agora configuration
+  if (AGORA_APP_ID === "your_agora_app_id" || AGORA_APP_CERTIFICATE === "your_agora_app_certificate") {
+    console.warn("⚠️  WARNING: Agora credentials not properly configured!");
     console.warn("⚠️  Please set AGORA_APP_ID and AGORA_APP_CERTIFICATE in your environment variables");
+    console.warn("⚠️  Video calling will not work without proper Agora credentials");
   } else {
-    console.log(`📞 Agora App ID: ${AGORA_APP_ID}`);
+    console.log("✅ Agora credentials configured successfully");
+    console.log(`📞 Agora App ID: ${AGORA_APP_ID.substring(0, 8)}...`);
   }
 });

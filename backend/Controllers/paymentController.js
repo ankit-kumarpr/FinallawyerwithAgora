@@ -26,7 +26,8 @@ const createOrder = async (req, res) => {
     const lawyer = await Lawyer.findOne({ lawyerId });
     if (!lawyer) return res.status(404).json({ error: true, message: "Lawyer not Found" });
 
-    const amountPaise = Math.max(1, Number(lawyer.consultation_fees || 0)) * 100; // safety
+    // Use lawyer's consultation fee directly (not per minute)
+    const amountPaise = Math.max(1, Number(lawyer.consultation_fees || 0)) * 100;
 
     const order = await razorpay.orders.create({
       amount: amountPaise,
@@ -34,13 +35,14 @@ const createOrder = async (req, res) => {
       receipt: `receipt_${Date.now()}`,
     });
 
-    // Save booking (store order.id to cross-check if needed)
+    // Save booking with fixed duration
     const booking = await new Booking({
       userId: req.user.userId,
       lawyerId,
       mode,
       amount: lawyer.consultation_fees,
-      paymentId: order.id, // this is the ORDER ID at creation time
+      duration: 900, // Fixed 15 minutes (900 seconds)
+      paymentId: order.id,
       paymentStatus: "pending",
       status: "requested",
     }).save();
@@ -122,9 +124,12 @@ const verifyPayment = async (req, res) => {
       const channelName = `booking-${booking._id}`;
       const expireTime = 3600; // 1 hour
 
-      // Generate tokens for both user and lawyer
-      const userAgora = generateAgoraToken(channelName, booking.userId, RtcRole.PUBLISHER, expireTime);
-      const lawyerAgora = generateAgoraToken(channelName, booking.lawyerId, RtcRole.PUBLISHER, expireTime);
+      // Generate unique UIDs for user and lawyer (avoid conflicts)
+      const userUid = Math.floor(Math.random() * 100000) + 100000;
+      const lawyerUid = Math.floor(Math.random() * 100000) + 200000;
+
+      const userAgora = generateAgoraToken(channelName, userUid, RtcRole.PUBLISHER, expireTime);
+      const lawyerAgora = generateAgoraToken(channelName, lawyerUid, RtcRole.PUBLISHER, expireTime);
 
       agoraData = {
         channelName,
@@ -132,6 +137,12 @@ const verifyPayment = async (req, res) => {
         user: userAgora,
         lawyer: lawyerAgora
       };
+
+      console.log(`🎯 Generated Agora tokens for ${booking.mode} call:`, {
+        channelName,
+        userUid,
+        lawyerUid
+      });
 
       // Update booking with payment status and Agora data
       booking.paymentStatus = "success";
