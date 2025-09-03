@@ -2,7 +2,7 @@
 
 import { io } from "socket.io-client";
 
-const SERVER_URL = "https://finallawyerwithagora.onrender.com";
+const SERVER_URL = "https://lawyerwork.onrender.com";
 
 let socket = null;
 

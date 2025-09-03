@@ -59,7 +59,7 @@ const CustomerManagement = () => {
       try {
         const token = sessionStorage.getItem("token");
         const response = await axios.get(
-          "https://finallawyerwithagora.onrender.com/lawapi/common/alluser",
+          "https://lawyerwork.onrender.com/lawapi/common/alluser",
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -125,7 +125,7 @@ const CustomerManagement = () => {
       const token = sessionStorage.getItem("token");
 
       const response = await axios.post(
-        `https://finallawyerwithagora.onrender.com/lawapi/common/updateuser/${selectedCustomer.userId}`,
+        `https://lawyerwork.onrender.com/lawapi/common/updateuser/${selectedCustomer.userId}`,
         editedCustomer,
         {
           headers: {

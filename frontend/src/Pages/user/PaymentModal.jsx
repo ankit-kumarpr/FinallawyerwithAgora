@@ -24,9 +24,11 @@ const PaymentModal = ({
   const [remoteUsers, setRemoteUsers] = useState({});
   const [isInCall, setIsInCall] = useState(false);
   const [callStatus, setCallStatus] = useState("Connecting...");
+  const [callDuration, setCallDuration] = useState(0);
 
   const auth = useAuth();
   const currentUser = auth?.currentUser;
+  const callTimerRef = useRef(null);
 
   const serviceDetails = {
     call: {
@@ -50,7 +52,38 @@ const PaymentModal = ({
   };
 
   // Get total amount directly from lawyer's consultation fee
-  const total = serviceDetails[serviceType]?.price || lawyer?.consultation_fees || 10;
+  const total =
+    serviceDetails[serviceType]?.price || lawyer?.consultation_fees || 10;
+
+  // Start/stop call timer
+  useEffect(() => {
+    if (isInCall && callStatus === "Connected") {
+      const startTime = Date.now();
+      callTimerRef.current = setInterval(() => {
+        setCallDuration(Math.floor((Date.now() - startTime) / 1000));
+      }, 1000);
+    } else {
+      if (callTimerRef.current) {
+        clearInterval(callTimerRef.current);
+        callTimerRef.current = null;
+      }
+    }
+
+    return () => {
+      if (callTimerRef.current) {
+        clearInterval(callTimerRef.current);
+      }
+    };
+  }, [isInCall, callStatus]);
+
+  // Format call duration
+  const formatDuration = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`;
+  };
 
   // Initialize Agora client
   useEffect(() => {
@@ -76,7 +109,12 @@ const PaymentModal = ({
     const handleUserPublished = async (user, mediaType) => {
       try {
         await agoraClient.subscribe(user, mediaType);
-        console.log("✅ User subscribed to remote media:", mediaType, "from user:", user.uid);
+        console.log(
+          "✅ User subscribed to remote media:",
+          mediaType,
+          "from user:",
+          user.uid
+        );
 
         if (mediaType === "video") {
           const remoteVideoContainer = document.getElementById(
@@ -84,15 +122,15 @@ const PaymentModal = ({
           );
           if (remoteVideoContainer) {
             // Clear any existing content
-            remoteVideoContainer.innerHTML = '';
-            
+            remoteVideoContainer.innerHTML = "";
+
             // Create a new video element for the remote user
-            const videoElement = document.createElement('div');
+            const videoElement = document.createElement("div");
             videoElement.id = `remote-video-${user.uid}`;
-            videoElement.style.width = '100%';
-            videoElement.style.height = '100%';
+            videoElement.style.width = "100%";
+            videoElement.style.height = "100%";
             remoteVideoContainer.appendChild(videoElement);
-            
+
             // Play the remote video
             user.videoTrack.play(`remote-video-${user.uid}`);
             console.log("✅ Remote video track playing for user:", user.uid);
@@ -140,7 +178,12 @@ const PaymentModal = ({
 
     // Add listener for when user publishes their own tracks
     const handleUserPublish = (user, mediaType) => {
-      console.log("🎯 User published their own track:", mediaType, "UID:", user.uid);
+      console.log(
+        "🎯 User published their own track:",
+        mediaType,
+        "UID:",
+        user.uid
+      );
     };
 
     agoraClient.on("user-published", handleUserPublished);
@@ -161,7 +204,9 @@ const PaymentModal = ({
   // Effect to handle local video display when tracks change
   useEffect(() => {
     if (localTracks.length > 0 && serviceType === "video") {
-      const videoTrack = localTracks.find(track => track.trackMediaType === 'video');
+      const videoTrack = localTracks.find(
+        (track) => track.trackMediaType === "video"
+      );
       if (videoTrack) {
         // Wait for DOM to be ready and then play local video
         const timer = setTimeout(() => {
@@ -182,6 +227,50 @@ const PaymentModal = ({
       }
     }
   }, [localTracks, serviceType]);
+
+  // Effect to ensure video tracks are properly published
+  useEffect(() => {
+    if (isInCall && localTracks.length > 0 && serviceType === "video") {
+      console.log("🔍 Ensuring video tracks are published...");
+
+      // Force republish video tracks if needed
+      const videoTrack = localTracks.find(
+        (track) => track.trackMediaType === "video"
+      );
+      if (videoTrack && !videoTrack.enabled) {
+        videoTrack.setEnabled(true);
+        console.log("✅ Video track re-enabled");
+      }
+    }
+  }, [isInCall, localTracks, serviceType]);
+
+  // Effect to monitor remote users and ensure proper video display
+  useEffect(() => {
+    if (Object.keys(remoteUsers).length > 0) {
+      console.log("🔍 Remote users detected:", Object.keys(remoteUsers));
+
+      // Ensure our video is published for remote users
+      if (localTracks.length > 0 && serviceType === "video") {
+        const videoTrack = localTracks.find(
+          (track) => track.trackMediaType === "video"
+        );
+        if (videoTrack) {
+          console.log("✅ Video track available for remote users");
+          // Force republish if needed
+          if (agoraClient && videoTrack.enabled) {
+            agoraClient
+              .publish([videoTrack])
+              .then(() => {
+                console.log("✅ Video track republished for remote users");
+              })
+              .catch((err) => {
+                console.error("❌ Error republishing video:", err);
+              });
+          }
+        }
+      }
+    }
+  }, [remoteUsers, localTracks, serviceType, agoraClient]);
 
   useEffect(() => {
     setInternalShow(show);
@@ -207,7 +296,7 @@ const PaymentModal = ({
         appId: agoraData.appId,
         channelName: agoraData.channelName,
         uid: agoraData.uid,
-        serviceType
+        serviceType,
       });
 
       // Create local tracks based on call type
@@ -266,7 +355,6 @@ const PaymentModal = ({
             console.error("❌ Local video element not found");
           }
         }, 500);
-
       } else {
         // For audio calls, publish only audio
         await agoraClient.publish([localAudioTrack]);
@@ -274,13 +362,14 @@ const PaymentModal = ({
       }
 
       // Store local tracks for cleanup
-      const tracks = [localAudioTrack, localVideoTrack].filter((track) => track !== null);
+      const tracks = [localAudioTrack, localVideoTrack].filter(
+        (track) => track !== null
+      );
       setLocalTracks(tracks);
       console.log(`✅ Published ${tracks.length} tracks`);
 
       // Update call status
       setCallStatus("Waiting for lawyer to join...");
-
     } catch (error) {
       console.error("❌ User failed to join channel:", error);
       setCallStatus("Connection failed");
@@ -319,11 +408,13 @@ const PaymentModal = ({
   // Handle mute/unmute audio
   const toggleAudio = () => {
     if (localTracks.length > 0) {
-      const audioTrack = localTracks.find(track => track.trackMediaType === 'audio');
+      const audioTrack = localTracks.find(
+        (track) => track.trackMediaType === "audio"
+      );
       if (audioTrack) {
         const newState = !audioTrack.enabled;
         audioTrack.setEnabled(newState);
-        console.log(`🎤 Audio ${newState ? 'enabled' : 'disabled'}`);
+        console.log(`🎤 Audio ${newState ? "enabled" : "disabled"}`);
       }
     }
   };
@@ -331,23 +422,29 @@ const PaymentModal = ({
   // Handle video on/off
   const toggleVideo = () => {
     if (localTracks.length > 0) {
-      const videoTrack = localTracks.find(track => track.trackMediaType === 'video');
+      const videoTrack = localTracks.find(
+        (track) => track.trackMediaType === "video"
+      );
       if (videoTrack) {
         const newState = !videoTrack.enabled;
         videoTrack.setEnabled(newState);
-        console.log(`📹 Video ${newState ? 'enabled' : 'disabled'}`);
+        console.log(`📹 Video ${newState ? "enabled" : "disabled"}`);
       }
     }
   };
 
   // Get current audio/video states
   const getAudioState = () => {
-    const audioTrack = localTracks.find(track => track.trackMediaType === 'audio');
+    const audioTrack = localTracks.find(
+      (track) => track.trackMediaType === "audio"
+    );
     return audioTrack ? audioTrack.enabled : true;
   };
 
   const getVideoState = () => {
-    const videoTrack = localTracks.find(track => track.trackMediaType === 'video');
+    const videoTrack = localTracks.find(
+      (track) => track.trackMediaType === "video"
+    );
     return videoTrack ? videoTrack.enabled : true;
   };
 
@@ -368,7 +465,7 @@ const PaymentModal = ({
 
     try {
       const verifyRes = await fetch(
-        "https://finallawyerwithagora.onrender.com/lawapi/common/paymentverify",
+        "https://lawyerwork.onrender.com/lawapi/common/paymentverify",
         {
           method: "POST",
           headers: {
@@ -442,12 +539,17 @@ const PaymentModal = ({
 
           // Emit join events
           socket.emit("join-user", userData._id);
-          socket.emit("join-lawyer", verifyData.booking.lawyerId);
+          // Lawyer joins rooms using their public lawyerId (e.g., "Lawyer046"),
+          // not the Mongo ObjectId. Ensure we target that room for notifications.
+          socket.emit(
+            "join-lawyer",
+            lawyer?.lawyerId || verifyData.booking.lawyerId
+          );
           socket.emit("join-booking", bookingId);
 
           // Send booking notification
           socket.emit("new-booking-notification", {
-            lawyerId: verifyData.booking.lawyerId,
+            lawyerId: lawyer?.lawyerId || verifyData.booking.lawyerId,
             bookingId: bookingId,
             userId: userData._id,
             userName: userData.name || "User",
@@ -483,8 +585,10 @@ const PaymentModal = ({
         // Show success message and automatically proceed to video call
         if (serviceType === "video" || serviceType === "call") {
           // Don't close the modal, let it show the video call UI
-          console.log("🎉 Payment successful! Video call UI will appear automatically.");
-          
+          console.log(
+            "🎉 Payment successful! Video call UI will appear automatically."
+          );
+
           // Show success notification
           if (window.Swal) {
             window.Swal.fire({
@@ -494,7 +598,7 @@ const PaymentModal = ({
               timer: 2000,
               showConfirmButton: false,
               toast: true,
-              position: "top-end"
+              position: "top-end",
             });
           }
         }
@@ -514,7 +618,7 @@ const PaymentModal = ({
 
     try {
       const orderRes = await fetch(
-        "https://finallawyerwithagora.onrender.com/lawapi/common/createorder",
+        "https://lawyerwork.onrender.com/lawapi/common/createorder",
         {
           method: "POST",
           headers: {
@@ -570,194 +674,205 @@ const PaymentModal = ({
     }
   };
 
-  // Render video call UI
+  // Render video call UI in modal
   const renderVideoCallUI = () => {
     return (
-      <Modal show={internalShow} onHide={handleHide} centered fullscreen>
-        <Modal.Header
-          closeButton
-          style={{ background: "#dc3545", color: "white" }}
-        >
-          <Modal.Title>
-            <i className="fas fa-video me-2"></i>
-            Video Call with {lawyer?.name}
-            <span className="badge bg-light text-dark ms-2">{callStatus}</span>
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body style={{ padding: 0, position: "relative" }}>
-          <div
-            style={{
-              display: "flex",
-              height: "100vh",
-              backgroundColor: "#000",
-            }}
-          >
-            {/* Remote video */}
+      <Modal
+        show={internalShow}
+        onHide={handleHide}
+        centered
+        size="lg"
+        className="call-modal"
+      >
+        <Modal.Header className="call-header">
+          <div className="d-flex align-items-center w-100">
             <div
-              style={{
-                flex: 1,
-                position: "relative",
-              }}
-            >
-              <div
-                id="remote-video-container"
-                style={{ width: "100%", height: "100%" }}
-              >
-                {Object.keys(remoteUsers).length === 0 && (
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      height: "100%",
-                      color: "white",
-                    }}
-                  >
-                    <div>
-                      <i className="fas fa-user fa-5x mb-3"></i>
-                      <p>{callStatus}</p>
-                      <small>Waiting for lawyer to join...</small>
-                    </div>
+              className={`status-indicator ${
+                callStatus === "Connected" ? "connected" : "connecting"
+              }`}
+            ></div>
+            <div className="ms-2 flex-grow-1">
+              <Modal.Title className="call-title">
+                Video Consultation
+              </Modal.Title>
+              <div className="call-subtitle">with {lawyer?.name}</div>
+            </div>
+            <div className="call-duration">{formatDuration(callDuration)}</div>
+            <Button variant="close" onClick={handleHide} className="ms-2" />
+          </div>
+        </Modal.Header>
+        <Modal.Body className="call-body p-0">
+          <div className="video-call-container">
+            {/* Remote video container */}
+            <div id="remote-video-container" className="remote-video-container">
+              {Object.keys(remoteUsers).length === 0 ? (
+                <div className="video-placeholder">
+                  <div className="avatar-container">
+                    <i className="fas fa-user"></i>
                   </div>
-                )}
-              </div>
+                  <h5>Waiting for Lawyer</h5>
+                  <p className="text-muted">{callStatus}</p>
+                  <div className="mt-2">
+                    <Spinner animation="border" variant="primary" size="sm" />
+                  </div>
+                </div>
+              ) : (
+                <div className="connection-status connected">
+                  <i className="fas fa-check-circle me-1"></i>
+                  Lawyer Connected
+                </div>
+              )}
             </div>
 
             {/* Local video preview */}
-            <div
-              style={{
-                position: "absolute",
-                bottom: 20,
-                right: 20,
-                width: 150,
-                height: 100,
-                borderRadius: 8,
-                overflow: "hidden",
-                zIndex: 10,
-                border: "2px solid white",
-                backgroundColor: "#000",
-              }}
-            >
-              <div
-                id="local-video"
-                style={{ width: "100%", height: "100%" }}
-              ></div>
+            <div className="local-video-container">
+              <div id="local-video" className="local-video-preview"></div>
             </div>
 
-            {/* Call controls overlay */}
-            <div
-              style={{
-                position: "absolute",
-                bottom: 20,
-                left: "50%",
-                transform: "translateX(-50%)",
-                zIndex: 10,
-              }}
-            >
-              <div className="d-flex gap-2">
+            {/* Call controls */}
+            <div className="call-controls">
+              <div className="controls-container">
                 <Button
-                  variant={getAudioState() ? "outline-light" : "danger"}
-                  size="lg"
-                  style={{ borderRadius: "50%", width: "60px", height: "60px" }}
+                  className={`control-btn ${getAudioState() ? "" : "muted"}`}
                   onClick={toggleAudio}
+                  size="sm"
                 >
-                  <i className={`fas fa-microphone${getAudioState() ? '' : '-slash'}`}></i>
+                  <i
+                    className={`fas fa-microphone${
+                      getAudioState() ? "" : "-slash"
+                    }`}
+                  ></i>
                 </Button>
                 <Button
-                  variant={getVideoState() ? "outline-light" : "danger"}
-                  size="lg"
-                  style={{ borderRadius: "50%", width: "60px", height: "60px" }}
+                  className={`control-btn ${getVideoState() ? "" : "muted"}`}
                   onClick={toggleVideo}
+                  size="sm"
                 >
-                  <i className={`fas fa-video${getVideoState() ? '' : '-slash'}`}></i>
+                  <i
+                    className={`fas fa-video${getVideoState() ? "" : "-slash"}`}
+                  ></i>
+                </Button>
+                <Button
+                  className="control-btn end-call"
+                  onClick={leaveChannel}
+                  size="sm"
+                >
+                  <i className="fas fa-phone-slash"></i>
                 </Button>
               </div>
             </div>
+          </div>
 
-            {/* Debug info overlay */}
-            <div
-              style={{
-                position: "absolute",
-                top: 20,
-                right: 20,
-                zIndex: 10,
-                background: "rgba(0,0,0,0.7)",
-                color: "white",
-                padding: "10px",
-                borderRadius: "8px",
-                fontSize: "12px",
-                maxWidth: "300px",
-              }}
-            >
-              <div><strong>Debug Info:</strong></div>
-              <div>Status: {callStatus}</div>
-              <div>Local Tracks: {localTracks.length}</div>
-              <div>Remote Users: {Object.keys(remoteUsers).length}</div>
-              <div>Audio: {getAudioState() ? 'ON' : 'OFF'}</div>
-              <div>Video: {getVideoState() ? 'ON' : 'OFF'}</div>
-              {Object.keys(remoteUsers).map(uid => (
-                <div key={uid}>Remote User: {uid}</div>
-              ))}
+          {/* Call info section */}
+          <div className="call-info-section p-3 border-top">
+            <div className="d-flex align-items-center">
+              <img
+                src={
+                  lawyer?.lawyerImage
+                    ? `https://lawyerwork.onrender.com${lawyer.lawyerImage}`
+                    : "/logo.png"
+                }
+                alt={lawyer?.name}
+                className="lawyer-avatar-sm me-3"
+              />
+              <div className="flex-grow-1">
+                <h6 className="mb-0">{lawyer?.name}</h6>
+                <small className="text-muted">{lawyer?.specialization}</small>
+              </div>
+              <div
+                className={`status-badge ${
+                  callStatus === "Connected" ? "connected" : "connecting"
+                }`}
+              >
+                {callStatus}
+              </div>
             </div>
           </div>
         </Modal.Body>
-        <Modal.Footer style={{ background: "#f8f9fa" }}>
-          <Button variant="danger" onClick={leaveChannel}>
-            <i className="fas fa-phone-slash me-2"></i> End Call
-          </Button>
-        </Modal.Footer>
       </Modal>
     );
   };
 
-  // Render audio call UI
+  // Render audio call UI in modal
   const renderAudioCallUI = () => {
     return (
-      <Modal show={internalShow} onHide={handleHide} centered>
-        <Modal.Header
-          closeButton
-          style={{ background: "#0d6efd", color: "white" }}
-        >
-          <Modal.Title>
-            <i className="fas fa-phone me-2"></i>
-            Audio Call with {lawyer?.name}
-            <span className="badge bg-light text-dark ms-2">{callStatus}</span>
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="text-center py-5">
-          <div className="mb-4">
+      <Modal
+        show={internalShow}
+        onHide={handleHide}
+        centered
+        size="md"
+        className="call-modal"
+      >
+        <Modal.Header className="call-header">
+          <div className="d-flex align-items-center w-100">
             <div
-              style={{
-                width: 120,
-                height: 120,
-                borderRadius: "50%",
-                backgroundColor: "#f8f9fa",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                margin: "0 auto",
-                border: "4px solid #0d6efd",
-              }}
+              className={`status-indicator ${
+                callStatus === "Connected" ? "connected" : "connecting"
+              }`}
+            ></div>
+            <div className="ms-2 flex-grow-1">
+              <Modal.Title className="call-title">
+                Audio Consultation
+              </Modal.Title>
+              <div className="call-subtitle">with {lawyer?.name}</div>
+            </div>
+            <div className="call-duration">{formatDuration(callDuration)}</div>
+            <Button variant="close" onClick={handleHide} className="ms-2" />
+          </div>
+        </Modal.Header>
+        <Modal.Body className="call-body text-center p-4">
+          <div className="audio-call-container">
+            <div className="audio-avatar mb-4">
+              <i className="fas fa-user"></i>
+            </div>
+
+            <h5>{lawyer?.name}</h5>
+            <p className="text-muted mb-4">{lawyer?.specialization}</p>
+
+            <div
+              className={`status-badge-lg ${
+                callStatus === "Connected" ? "connected" : "connecting"
+              } mb-4`}
             >
-              <i className="fas fa-user fa-3x text-secondary"></i>
+              {callStatus}
+            </div>
+
+            {callStatus === "Connecting..." && (
+              <div className="mt-3">
+                <Spinner
+                  animation="border"
+                  variant="primary"
+                  className="mb-2"
+                />
+                <p>Connecting to lawyer...</p>
+              </div>
+            )}
+
+            {/* Call controls */}
+            <div className="call-controls mt-4">
+              <div className="controls-container justify-content-center">
+                <Button
+                  className={`control-btn ${getAudioState() ? "" : "muted"}`}
+                  onClick={toggleAudio}
+                  size="sm"
+                >
+                  <i
+                    className={`fas fa-microphone${
+                      getAudioState() ? "" : "-slash"
+                    }`}
+                  ></i>
+                </Button>
+                <Button
+                  className="control-btn end-call"
+                  onClick={leaveChannel}
+                  size="sm"
+                >
+                  <i className="fas fa-phone-slash"></i>
+                </Button>
+              </div>
             </div>
           </div>
-
-          <h4>{lawyer?.name}</h4>
-          <p className="text-muted">{callStatus}</p>
-
-          {callStatus === "Connecting..." && (
-            <div className="mt-4">
-              <Spinner animation="border" variant="primary" />
-              <p className="mt-2">Connecting to lawyer...</p>
-            </div>
-          )}
         </Modal.Body>
-        <Modal.Footer className="justify-content-center">
-          <Button variant="danger" onClick={leaveChannel}>
-            <i className="fas fa-phone-slash me-2"></i> End Call
-          </Button>
-        </Modal.Footer>
       </Modal>
     );
   };
@@ -765,9 +880,11 @@ const PaymentModal = ({
   // ⏳ Waiting screen for chat
   if (paymentSuccess && serviceType === "chat" && !bookingAccepted) {
     return (
-      <Modal show={internalShow} onHide={handleHide} centered>
-        <Modal.Body className="text-center py-5">
-          <div className="spinner-border text-primary mb-3"></div>
+      <Modal show={internalShow} onHide={handleHide} centered size="sm">
+        <Modal.Body className="text-center py-4">
+          <div className="mb-3">
+            <Spinner animation="border" variant="primary" />
+          </div>
           <h5>Waiting for lawyer to accept the session...</h5>
         </Modal.Body>
       </Modal>
@@ -782,21 +899,24 @@ const PaymentModal = ({
     chatReady
   ) {
     return (
-      <Modal show={internalShow} onHide={handleHide} centered fullscreen>
-        <Modal.Header
-          closeButton
-          style={{ background: "#1c1c84", color: "white" }}
-        >
-          <Modal.Title>
-            <i className={`fas ${serviceDetails[serviceType]?.icon} me-2`}></i>
-            Chat Session with {lawyer?.name}
-          </Modal.Title>
+      <Modal
+        show={internalShow}
+        onHide={handleHide}
+        centered
+        size="lg"
+        className="chat-modal"
+      >
+        <Modal.Header className="chat-header">
+          <div className="d-flex align-items-center">
+            <div className="chat-icon me-2">
+              <i className={`fas ${serviceDetails[serviceType]?.icon}`}></i>
+            </div>
+            <Modal.Title className="mb-0">Chat with {lawyer?.name}</Modal.Title>
+          </div>
+          <Button variant="close" onClick={handleHide} />
         </Modal.Header>
-        <Modal.Body style={{ padding: 0, height: "100vh", overflow: "hidden" }}>
-          {sessionToken &&
-          bookingId &&
-          lawyer &&
-          currentUser?._id ? (
+        <Modal.Body style={{ height: "400px", overflow: "hidden" }}>
+          {sessionToken && bookingId && lawyer && currentUser?._id ? (
             <ChatBox
               sessionToken={sessionToken}
               chatDuration={15} // Fixed duration
@@ -823,11 +943,8 @@ const PaymentModal = ({
 
   // Payment UI
   return (
-    <Modal show={internalShow} onHide={handleHide} centered>
-      <Modal.Header
-        closeButton
-        style={{ background: "#1c1c84", color: "white" }}
-      >
+    <Modal show={internalShow} onHide={handleHide} centered size="md">
+      <Modal.Header closeButton className="bg-primary text-white">
         <Modal.Title>
           <i className={`fas ${serviceDetails[serviceType]?.icon} me-2`}></i>
           {serviceDetails[serviceType]?.name || "Consultation"} Payment
@@ -835,18 +952,8 @@ const PaymentModal = ({
       </Modal.Header>
       <Modal.Body>
         <div className="text-center mb-4">
-          <div className="d-flex justify-content-center mb-3">
-            <div
-              style={{
-                width: "80px",
-                height: "80px",
-                borderRadius: "50%",
-                background: `${serviceDetails[serviceType]?.color}20`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
+          <div className="mb-3">
+            <div className="payment-icon mx-auto">
               <i
                 className={`fas ${serviceDetails[serviceType]?.icon} fa-2x`}
                 style={{ color: serviceDetails[serviceType]?.color }}
@@ -857,31 +964,24 @@ const PaymentModal = ({
           <p className="text-muted">{lawyer?.specialization}</p>
         </div>
 
-        <div
-          className="p-4 mb-3"
-          style={{
-            background: "#f8f9fa",
-            borderRadius: "10px",
-            borderLeft: `4px solid ${serviceDetails[serviceType]?.color}`,
-          }}
-        >
-          <div className="d-flex justify-content-between mb-2">
+        <div className="payment-details-card p-3 mb-3">
+          <div className="detail-row d-flex justify-content-between mb-2">
             <span className="text-muted">Service:</span>
             <span>{serviceDetails[serviceType]?.name}</span>
           </div>
-          <div className="d-flex justify-content-between mb-2">
+          <div className="detail-row d-flex justify-content-between mb-2">
             <span className="text-muted">Lawyer:</span>
             <span>{lawyer?.name}</span>
           </div>
-          <div className="d-flex justify-content-between mb-2">
+          <div className="detail-row d-flex justify-content-between mb-2">
             <span className="text-muted">Specialization:</span>
             <span>{lawyer?.specialization}</span>
           </div>
           <hr />
-          <div className="d-flex justify-content-between">
+          <div className="detail-row d-flex justify-content-between">
             <strong>Total Amount:</strong>
             <strong
-              className="h5"
+              className="h5 mb-0"
               style={{ color: serviceDetails[serviceType]?.color }}
             >
               ₹{total}
@@ -893,7 +993,7 @@ const PaymentModal = ({
         <Button
           variant="outline-secondary"
           onClick={handleHide}
-          style={{ borderRadius: "20px", padding: "8px 20px" }}
+          className="rounded-pill px-3"
         >
           Cancel
         </Button>
@@ -903,19 +1003,22 @@ const PaymentModal = ({
           disabled={loading}
           style={{
             background: serviceDetails[serviceType]?.color,
-            border: "none",
+            borderColor: serviceDetails[serviceType]?.color,
             borderRadius: "20px",
             padding: "8px 20px",
-            minWidth: "100px",
           }}
+          className="rounded-pill px-4"
         >
           {loading ? (
             <>
-              <span
-                className="spinner-border spinner-border-sm me-2"
+              <Spinner
+                as="span"
+                animation="border"
+                size="sm"
                 role="status"
                 aria-hidden="true"
-              ></span>
+                className="me-2"
+              />
               Processing...
             </>
           ) : (
@@ -926,5 +1029,278 @@ const PaymentModal = ({
     </Modal>
   );
 };
+
+// Add these styles to your CSS file
+const styles = `
+.call-modal .modal-content {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.call-header {
+  background: linear-gradient(135deg, #1c1c84, #2e2ea1);
+  color: white;
+  border: none;
+  padding: 1rem;
+}
+
+.status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.status-indicator.connected {
+  background-color: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.3);
+}
+
+.status-indicator.connecting {
+  background-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.3);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+.call-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+  color: #fff;
+}
+
+.call-subtitle {
+  font-size: 0.8rem;
+  color: #e0e7ff;
+}
+
+.call-duration {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #e0e7ff;
+  margin-right: 10px;
+}
+
+.call-body {
+  padding: 0;
+}
+
+.video-call-container {
+  position: relative;
+  height: 300px;
+  background: #1f2937;
+}
+
+.remote-video-container {
+  width: 100%;
+  height: 100%;
+  background-color: #374151;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-placeholder {
+  text-align: center;
+  color: #d1d5db;
+}
+
+.avatar-container {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem;
+}
+
+.avatar-container i {
+  font-size: 2rem;
+  color: #9ca3af;
+}
+
+.connection-status {
+  position: absolute;
+  top: 1rem;
+  left: 0;
+  right: 0;
+  text-align: center;
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.7);
+  color: #22c55e;
+  padding: 0.3rem;
+  font-size: 0.8rem;
+}
+
+.local-video-container {
+  position: absolute;
+  bottom: 70px;
+  right: 15px;
+  width: 100px;
+  height: 75px;
+  z-index: 20;
+  border: 2px solid white;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+}
+
+.local-video-preview {
+  width: 100%;
+  height: 100%;
+}
+
+.call-controls {
+  position: absolute;
+  bottom: 15px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  z-index: 10;
+}
+
+.controls-container {
+  display: flex;
+  gap: 0.8rem;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 0.5rem 0.8rem;
+  border-radius: 50px;
+  backdrop-filter: blur(10px);
+}
+
+.control-btn {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.control-btn:hover {
+  transform: scale(1.05);
+}
+
+.control-btn.muted {
+  background-color: #ef4444 !important;
+  color: white !important;
+}
+
+.control-btn.end-call {
+  background-color: #ef4444;
+  color: white;
+}
+
+.call-info-section {
+  background: #f9fafb;
+}
+
+.lawyer-avatar-sm {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.status-badge {
+  padding: 0.2rem 0.5rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.status-badge.connected {
+  background-color: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+
+.status-badge.connecting {
+  background-color: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+}
+
+.status-badge-lg {
+  padding: 0.4rem 1rem;
+  border-radius: 20px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.status-badge-lg.connected {
+  background-color: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+
+.status-badge-lg.connecting {
+  background-color: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+}
+
+.audio-call-container {
+  padding: 1rem 0;
+}
+
+.audio-avatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1c1c84, #2e2ea1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  color: white;
+  font-size: 2.5rem;
+}
+
+.payment-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.payment-details-card {
+  background: #f9fafb;
+  border-radius: 8px;
+  border-left: 4px solid #4f46e5;
+}
+
+.chat-header {
+ background: linear-gradient(135deg, #1c1c84, #2e2ea1);
+  color: white;
+}
+
+.chat-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+`;
+
+// Add styles to the document
+if (typeof document !== "undefined") {
+  const styleSheet = document.createElement("style");
+  styleSheet.innerText = styles;
+  document.head.appendChild(styleSheet);
+}
 
 export default PaymentModal;

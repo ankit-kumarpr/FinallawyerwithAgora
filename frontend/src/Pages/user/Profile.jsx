@@ -16,7 +16,7 @@ const ClientProfile = () => {
   });
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const API_BASE = "https://finallawyerwithagora.onrender.com/lawapi";
+  const API_BASE = "https://lawyerwork.onrender.com/lawapi";
 
   useEffect(() => {
     const fetchUserProfile = async () => {

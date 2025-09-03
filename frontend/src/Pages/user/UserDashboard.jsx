@@ -21,7 +21,7 @@ const UserDashboard = () => {
   const [meetingCount, setMeetingCount] = useState(0);
   const [requestCount, setRequestCount] = useState(0);
 
-  const API_BASE = "https://finallawyerwithagora.onrender.com/lawapi";
+  const API_BASE = "https://lawyerwork.onrender.com/lawapi";
 
   useEffect(() => {
     const fetchMeetingAndRequestCounts = async () => {

@@ -45,7 +45,7 @@ const useLawyerData = () => {
         if (!token) throw new Error("No authentication token found");
 
         const profileRes = await axios.get(
-          "https://finallawyerwithagora.onrender.com/lawapi/auth/profile",
+          "https://lawyerwork.onrender.com/lawapi/auth/profile",
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
@@ -218,7 +218,7 @@ const LawyerDashboard = () => {
 
     try {
       const res = await fetch(
-        `https://finallawyerwithagora.onrender.com/lawapi/common/bookings/${bookingId}`,
+        `https://lawyerwork.onrender.com/lawapi/common/bookings/${bookingId}`,
         {
           method: "PUT",
           headers: {
@@ -331,8 +331,26 @@ const LawyerDashboard = () => {
 
     socket.on("booking-notification", handleBookingNotification);
 
+    // Fallback: some servers might mistakenly send chat as "incoming-call"
+    const handleIncomingCallForChat = (data) => {
+      if ((data?.mode || "").toString().trim().toLowerCase() !== "chat") return;
+      console.log(
+        "📥 Incoming-call received for chat; treating as booking-notification:",
+        data
+      );
+      handleBookingNotification({
+        bookingId: data.bookingId,
+        userName: data.userName,
+        _id: data._id || data.userId,
+        mode: "chat",
+        createdAt: data.timestamp,
+      });
+    };
+    socket.on("incoming-call", handleIncomingCallForChat);
+
     return () => {
       socket.off("booking-notification", handleBookingNotification);
+      socket.off("incoming-call", handleIncomingCallForChat);
       if (socket.connected) socket.disconnect();
     };
   }, []);

@@ -33,7 +33,7 @@ const MyRequests = () => {
         const userId = userData?.userId || userData?._id;
 
         const res = await axios.get(
-          `https://finallawyerwithagora.onrender.com/lawapi/common/userrequest/${userId}`,
+          `https://lawyerwork.onrender.com/lawapi/common/userrequest/${userId}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

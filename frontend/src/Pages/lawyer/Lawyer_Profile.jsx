@@ -37,7 +37,7 @@ const LawyerProfile = () => {
       return;
     }
 
-    const newSocket = io("https://finallawyerwithagora.onrender.com", {
+    const newSocket = io("https://lawyerwork.onrender.com", {
       auth: { token },
       transports: ["websocket"],
     });
@@ -57,7 +57,7 @@ const LawyerProfile = () => {
           Authorization: `Bearer ${token}`,
         };
         const response = await axios.get(
-          "https://finallawyerwithagora.onrender.com/lawapi/auth/profile",
+          "https://lawyerwork.onrender.com/lawapi/auth/profile",
           { headers }
         );
         setData(response.data.data);
@@ -163,7 +163,7 @@ const LawyerProfile = () => {
   const handleSaveProfile = (e) => {
     e.preventDefault();
     handleApiCall(
-      `https://finallawyerwithagora.onrender.com/lawapi/common/updatelawyer/${data.lawyerId}`,
+      `https://lawyerwork.onrender.com/lawapi/common/updatelawyer/${data.lawyerId}`,
       editedData,
       "Profile updated successfully",
       "Update failed"
@@ -172,7 +172,7 @@ const LawyerProfile = () => {
 
   const handleStatusUpdate = (newStatus) => {
     handleApiCall(
-      `https://finallawyerwithagora.onrender.com/lawapi/common/updatelawyer/${data.lawyerId}`,
+      `https://lawyerwork.onrender.com/lawapi/common/updatelawyer/${data.lawyerId}`,
       { status: newStatus },
       "Status updated successfully!",
       "Failed to update status"
@@ -212,7 +212,7 @@ const LawyerProfile = () => {
 
     try {
       const response = await axios.post(
-        `https://finallawyerwithagora.onrender.com/lawapi/common/updatelawyer/${data.lawyerId}`,
+        `https://lawyerwork.onrender.com/lawapi/common/updatelawyer/${data.lawyerId}`,
         formData,
         {
           headers: {
@@ -393,7 +393,7 @@ const LawyerProfile = () => {
                 />
               ) : data?.lawyerImage ? (
                 <img
-                  src={`https://finallawyerwithagora.onrender.com${data.lawyerImage}`}
+                  src={`https://lawyerwork.onrender.com${data.lawyerImage}`}
                   alt={data.name}
                   className="profile-picture"
                   onError={(e) => {

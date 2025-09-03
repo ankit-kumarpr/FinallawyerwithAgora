@@ -46,7 +46,7 @@ const FindLawyer = () => {
     const fetchLawyers = async () => {
       try {
         const response = await axios.get(
-          "https://finallawyerwithagora.onrender.com/lawapi/common/lwayerlist"
+          "https://lawyerwork.onrender.com/lawapi/common/lwayerlist"
         );
 
         console.log("Fetched lawyers:", response.data);

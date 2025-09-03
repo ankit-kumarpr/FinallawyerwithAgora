@@ -41,13 +41,15 @@ const LawyerProfileModal = ({ show, handleClose, lawyer }) => {
   const handlePaymentSuccess = (paymentResult) => {
     // For video calls, don't close the modal - let it show the video call UI
     if (selectedService === "video" || selectedService === "call") {
-      console.log("🎉 Video call payment successful! Modal will stay open for video call UI.");
+      console.log(
+        "🎉 Video call payment successful! Modal will stay open for video call UI."
+      );
       return; // Don't close modal for video calls
     }
 
     // For other services, close the modal
     setShowPaymentModal(false);
-    
+
     if (selectedService === "chat") {
       setActiveSession({
         sessionToken: paymentResult.sessionToken,
@@ -102,7 +104,7 @@ const LawyerProfileModal = ({ show, handleClose, lawyer }) => {
   };
 
   const lawyerImageUrl = lawyer?.lawyerImage
-    ? `https://finallawyerwithagora.onrender.com${lawyer.lawyerImage}`
+    ? `https://lawyerwork.onrender.com${lawyer.lawyerImage}`
     : null;
 
   return (

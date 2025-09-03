@@ -3,6 +3,7 @@ import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "../components/AuthContext";
 import { initSocket, getSocket } from "../components/socket";
+import { initAgoraChat, sendText, sendTyping } from "./agoraChatClient";
 import { toast } from "react-toastify";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
@@ -88,12 +89,19 @@ const MessagesContainer = styled.div`
 `;
 
 const MessageBubble = styled.div`
-  max-width: 80%;
-  padding: 12px 16px;
+  max-width: 52%;
+  padding: 10px 12px;
   border-radius: 18px;
   position: relative;
   word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  line-height: 1.35;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+
+  @media (max-width: 768px) {
+    max-width: 70%;
+  }
 
   &.sent {
     align-self: flex-end;
@@ -120,10 +128,13 @@ const MessageMeta = styled.div`
 
 const InputContainer = styled.form`
   display: flex;
-  padding: 12px;
+  padding: 10px 12px;
   background-color: white;
   border-top: 1px solid #e0e0e0;
   align-items: center;
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
 `;
 
 const EmptyState = styled.div`
@@ -157,6 +168,9 @@ const FileInput = styled.input`
   display: none;
 `;
 
+// Helper to format a date (YYYY-MM-DD) for separators
+const formatDayKey = (iso) => new Date(iso).toDateString();
+
 const ChatBox = ({
   sessionToken,
   chatDuration,
@@ -182,6 +196,11 @@ const ChatBox = ({
   const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const [useAgoraChat, setUseAgoraChat] = useState(true); // prefer Agora Chat; fall back to sockets if token endpoint fails
+  const chatPeerUsername =
+    role === "lawyer"
+      ? client?._id || client?.name || "client"
+      : lawyer?.lawyerId || lawyer?._id || lawyer?.name || "lawyer";
 
   useEffect(() => {
     const token = sessionToken || sessionStorage.getItem("token");
@@ -191,19 +210,13 @@ const ChatBox = ({
     }
 
     const socket = getSocket();
-    if (!socket) {
-      console.error(
-        "❌ Socket has not been initialized. Cannot establish chat."
-      );
-      return;
-    }
-    socketRef.current = socket;
+    socketRef.current = socket || null;
 
     // --- Fetch history ---
     const fetchChatHistory = async () => {
       try {
         const res = await axios.get(
-          `https://finallawyerwithagora.onrender.com/lawapi/common/gethistory/${bookingId}`,
+          `https://lawyerwork.onrender.com/lawapi/common/gethistory/${bookingId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (!res.data.error && Array.isArray(res.data.data)) {
@@ -219,7 +232,9 @@ const ChatBox = ({
         );
       }
     };
-    fetchChatHistory();
+    if (!useAgoraChat) {
+      fetchChatHistory();
+    }
 
     // --- Event handlers ---
     const handleConnect = () => {
@@ -235,7 +250,7 @@ const ChatBox = ({
       if (data.bookingId === bookingId) {
         setSessionStatus("active");
         setRemainingTime(data.duration || chatDuration * 60);
-        toast.success("✅ Session started!");
+        // Avoid spamming toasts; one is enough globally
       }
     };
 
@@ -258,24 +273,81 @@ const ChatBox = ({
     };
 
     // --- Attach listeners ---
-    if (socket.connected) {
-      handleConnect();
+    if (socket) {
+      if (socket.connected) handleConnect();
+      socket.on("connect", handleConnect);
+      socket.on("disconnect", handleDisconnect);
+      socket.on("session-started", handleSessionStarted);
+      socket.on("new-message", handleNewMessage);
+      socket.on("session-ended", handleSessionEnded);
+      socket.on("typing", handleTypingIndicator);
     }
-    socket.on("connect", handleConnect);
-    socket.on("disconnect", handleDisconnect);
-    socket.on("session-started", handleSessionStarted);
-    socket.on("new-message", handleNewMessage);
-    socket.on("session-ended", handleSessionEnded);
-    socket.on("typing", handleTypingIndicator);
+
+    // Initialize Agora Chat SDK (separate from RTC)
+    (async () => {
+      if (!useAgoraChat) return;
+      try {
+        const token = sessionToken || sessionStorage.getItem("token");
+        const userData = JSON.parse(sessionStorage.getItem("userData") || "{}");
+        const username = (
+          userData?._id ||
+          currentUser?._id ||
+          "user"
+        ).toString();
+        const resp = await axios.post(
+          "https://lawyerwork.onrender.com/lawapi/common/agora-chat/token",
+          { username },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const { appKey, accessToken } = resp.data;
+        await initAgoraChat({
+          appKey,
+          username,
+          accessToken,
+          onMessage: (msg) => {
+            if (
+              msg?.chatType === "singleChat" &&
+              (msg?.from === chatPeerUsername || msg?.to === chatPeerUsername)
+            ) {
+              const incoming = {
+                id: msg.id,
+                sender: msg.from,
+                senderId: msg.from,
+                senderRole:
+                  msg.from === (userData?._id || currentUser?._id)?.toString()
+                    ? role
+                    : role === "lawyer"
+                    ? "client"
+                    : "lawyer",
+                content: msg.msg,
+                type: "text",
+                bookingId,
+                timestamp: new Date().toISOString(),
+              };
+              setMessages((prev) => [...prev, incoming]);
+            }
+          },
+          onTyping: () => setOtherTyping(true),
+        });
+        setSessionStatus("active");
+      } catch (e) {
+        console.error("Agora Chat init failed", e?.response?.data || e.message);
+        // Fallback to socket-based chat when backend token endpoint is missing
+        setUseAgoraChat(false);
+        fetchChatHistory();
+      }
+    })();
 
     // --- Cleanup ---
     return () => {
-      socket.off("connect", handleConnect);
-      socket.off("disconnect", handleDisconnect);
-      socket.off("session-started", handleSessionStarted);
-      socket.off("new-message", handleNewMessage);
-      socket.off("session-ended", handleSessionEnded);
-      socket.off("typing", handleTypingIndicator);
+      if (socket) {
+        socket.off("connect", handleConnect);
+        socket.off("disconnect", handleDisconnect);
+        socket.off("session-started", handleSessionStarted);
+        socket.off("new-message", handleNewMessage);
+        socket.off("session-ended", handleSessionEnded);
+        socket.off("typing", handleTypingIndicator);
+      }
     };
   }, [bookingId, currentUser?._id, sessionToken]); // 👈 add deps
 
@@ -306,7 +378,7 @@ const ChatBox = ({
 
     const token = sessionToken || sessionStorage.getItem("token");
     const msgData = {
-      id: uuidv4(), // Temporary ID for React key purposes
+      id: uuidv4(),
       sender: currentUser.name,
       senderId: currentUser._id,
       senderRole: role,
@@ -316,30 +388,45 @@ const ChatBox = ({
       timestamp: new Date().toISOString(),
     };
 
-    // Emit the message to the server
+    // Emit via sockets so the other side receives instantly
     socketRef.current?.emit("chat-message", msgData);
 
-    // Optimistically add the message to our own UI
+    // Also send via Agora Chat SDK if available (best-effort)
+    if (useAgoraChat) {
+      sendText({ to: chatPeerUsername.toString(), text: message }).catch(
+        () => {}
+      );
+    }
+
     setMessages((prev) => [...prev, msgData]);
     setMessage("");
+    setShowEmojiPicker(false);
 
-    // Persist the message to the database in the background
-    // try {
-    //   await axios.post(
-    //     'https://finallawyerwithagora.onrender.com/lawapi/common/sendmessage',
-    //     { bookingId, content: message, files: [] },
-    //     { headers: { Authorization: `Bearer ${token}` } }
-    //   );
-    // } catch (err) {
-    //   console.error('❌ Failed to save message', err.response?.data || err.message);
-    // toast.error("Failed to send message.");
-    // Optional: Here you could implement logic to mark the message as "failed" in the UI
-    // }
+    // Persist the message to the database in the background (non-blocking)
+    axios
+      .post(
+        "https://lawyerwork.onrender.com/lawapi/common/sendmessage",
+        { bookingId, content: msgData.content, files: [] },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      .catch((err) => {
+        console.error(
+          "❌ Failed to save message",
+          err.response?.data || err.message
+        );
+      });
   };
 
   const handleTyping = (e) => {
     setMessage(e.target.value);
-    socketRef.current?.emit("typing", { bookingId, senderId: currentUser._id });
+    if (useAgoraChat) {
+      sendTyping({ to: chatPeerUsername.toString() }).catch(() => {});
+    } else {
+      socketRef.current?.emit("typing", {
+        bookingId,
+        senderId: currentUser._id,
+      });
+    }
   };
 
   const handleEndSession = () => {
@@ -369,12 +456,13 @@ const ChatBox = ({
         timestamp: new Date().toISOString(),
       };
 
+      // Emit file message in real-time
       socketRef.current?.emit("chat-message", msg);
       setMessages((prev) => [...prev, msg]);
 
       try {
         await axios.post(
-          "https://finallawyerwithagora.onrender.com/lawapi/common/sendmessage",
+          "https://lawyerwork.onrender.com/lawapi/common/sendmessage",
           {
             bookingId,
             content: `File: ${file.name}`,
@@ -395,11 +483,37 @@ const ChatBox = ({
         );
       } catch (err) {
         console.error("❌ Failed to save file message", err);
-        toast.error("Failed to upload file.");
+        // Limit toasts to avoid spam
       }
     };
     reader.readAsDataURL(file);
   };
+
+  const handleEmojiSelect = (emoji) => {
+    setMessage((prev) => `${prev}${emoji.native || emoji.shortcodes || ""}`);
+  };
+
+  // Group messages by day for separators
+  const groupedByDay = React.useMemo(() => {
+    const groups = [];
+    let currentKey = null;
+    let currentItems = [];
+    const list = (messages || []).filter((m) => m?.content);
+    list.forEach((msg) => {
+      const key = formatDayKey(msg.timestamp);
+      if (key !== currentKey) {
+        if (currentItems.length)
+          groups.push({ key: currentKey, items: currentItems });
+        currentKey = key;
+        currentItems = [msg];
+      } else {
+        currentItems.push(msg);
+      }
+    });
+    if (currentItems.length)
+      groups.push({ key: currentKey, items: currentItems });
+    return groups;
+  }, [messages]);
 
   const formatTime = (secs) =>
     `${Math.floor(secs / 60)}:${(secs % 60).toString().padStart(2, "0")}`;
@@ -461,6 +575,7 @@ const ChatBox = ({
           )}
         </SessionInfo>
       </ChatHeader>
+
       <MessagesContainer>
         {sessionStatus === "waiting" ? (
           <EmptyState>
@@ -473,7 +588,7 @@ const ChatBox = ({
               {role === "lawyer" ? "the client" : "your attorney"}
             </Typography>
           </EmptyState>
-        ) : messages.length === 0 && sessionStatus === "active" ? (
+        ) : groupedByDay.length === 0 && sessionStatus === "active" ? (
           <EmptyState>
             <Typography variant="h5" color="primary">
               ⚖️ Secure Legal Consultation
@@ -486,66 +601,95 @@ const ChatBox = ({
             </Typography>
           </EmptyState>
         ) : (
-          messages
-            .filter((msg) => msg?.content)
-            .map((msg, index) => (
-              <MessageBubble
-                key={msg.id || msg._id || `${msg.timestamp}-${index}`}
-                className={
-                  msg.senderId === currentUser._id ? "sent" : "received"
-                }
+          groupedByDay.map((group) => (
+            <div key={group.key}>
+              <Typography
+                variant="caption"
+                sx={{
+                  display: "block",
+                  textAlign: "center",
+                  opacity: 0.7,
+                  mb: 1,
+                }}
               >
-                <MessageMeta>
-                  <span>
-                    {msg.senderRole === "lawyer" ? (
-                      <WorkIcon
-                        fontSize="inherit"
-                        sx={{ verticalAlign: "middle", mr: 0.5 }}
+                {group.key}
+              </Typography>
+              {group.items.map((msg, index) => (
+                <MessageBubble
+                  key={msg.id || msg._id || `${msg.timestamp}-${index}`}
+                  className={
+                    (msg.senderRole ||
+                      (msg.senderId === currentUser._id
+                        ? role
+                        : role === "lawyer"
+                        ? "client"
+                        : "lawyer")) === role
+                      ? "sent"
+                      : "received"
+                  }
+                >
+                  <MessageMeta>
+                    <span>
+                      {msg.senderRole === "lawyer" ? (
+                        <WorkIcon
+                          fontSize="inherit"
+                          sx={{ verticalAlign: "middle", mr: 0.5 }}
+                        />
+                      ) : (
+                        <PersonIcon
+                          fontSize="inherit"
+                          sx={{ verticalAlign: "middle", mr: 0.5 }}
+                        />
+                      )}
+                      {msg.sender}
+                    </span>
+                    <span>
+                      {new Date(msg.timestamp).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </MessageMeta>
+                  {msg.type === "file" ? (
+                    msg.fileType && msg.fileType.startsWith("image") ? (
+                      <img
+                        src={msg.content}
+                        alt={msg.filename}
+                        style={{
+                          maxWidth: "100%",
+                          borderRadius: 8,
+                          marginTop: 6,
+                        }}
                       />
                     ) : (
-                      <PersonIcon
-                        fontSize="inherit"
-                        sx={{ verticalAlign: "middle", mr: 0.5 }}
-                      />
-                    )}
-                    {msg.sender}
-                  </span>
-                  <span>
-                    {new Date(msg.timestamp).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                </MessageMeta>
-                {msg.type === "file" ? (
-                  msg.fileType && msg.fileType.startsWith("image") ? (
-                    <img
-                      src={msg.content}
-                      alt={msg.filename}
-                      style={{
-                        maxWidth: "100%",
-                        borderRadius: 8,
-                        marginTop: 4,
-                      }}
-                    />
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 8,
+                          marginTop: 6,
+                        }}
+                      >
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          href={msg.content}
+                          download={msg.filename}
+                          target="_blank"
+                          rel="noreferrer"
+                          sx={{ textTransform: "none", padding: "2px 8px" }}
+                        >
+                          📎 {msg.filename || "Attachment"}
+                        </Button>
+                      </div>
+                    )
                   ) : (
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      href={msg.content}
-                      download={msg.filename}
-                      target="_blank"
-                      rel="noreferrer"
-                      sx={{ mt: 1, textTransform: "none" }}
-                    >
-                      📄 {msg.filename || "Download File"}
-                    </Button>
-                  )
-                ) : (
-                  <div>{msg.content}</div>
-                )}
-              </MessageBubble>
-            ))
+                    <div>{msg.content}</div>
+                  )}
+                </MessageBubble>
+              ))}
+            </div>
+          ))
         )}
         <div ref={messagesEndRef} />
       </MessagesContainer>
@@ -560,14 +704,33 @@ const ChatBox = ({
               </span>
             </TypingIndicator>
           )}
+
+          {showEmojiPicker && (
+            <EmojiPickerContainer ref={emojiPickerRef}>
+              <Picker
+                data={data}
+                onEmojiSelect={handleEmojiSelect}
+                theme="light"
+                previewPosition="none"
+                navPosition="bottom"
+              />
+            </EmojiPickerContainer>
+          )}
+
           <InputContainer onSubmit={handleSendMessage}>
             <Tooltip title="Add emoji">
-              <IconButton onClick={() => setShowEmojiPicker((prev) => !prev)}>
+              <IconButton
+                onClick={() => setShowEmojiPicker((prev) => !prev)}
+                aria-label="emoji"
+              >
                 <EmojiIcon color="primary" />
               </IconButton>
             </Tooltip>
             <Tooltip title="Attach file">
-              <IconButton onClick={() => fileInputRef.current.click()}>
+              <IconButton
+                onClick={() => fileInputRef.current.click()}
+                aria-label="attach-file"
+              >
                 <AttachFileIcon color="primary" />
               </IconButton>
             </Tooltip>
@@ -575,7 +738,7 @@ const ChatBox = ({
               type="file"
               ref={fileInputRef}
               onChange={handleFileUpload}
-              accept="image/*,application/pdf,.doc,.docx"
+              accept="*/*"
             />
             <TextField
               fullWidth
@@ -587,6 +750,8 @@ const ChatBox = ({
               disabled={!socketConnected}
               sx={{ mx: 1 }}
               autoComplete="off"
+              multiline
+              maxRows={4}
             />
             <Tooltip title="Send message">
               <span>
@@ -594,6 +759,7 @@ const ChatBox = ({
                   type="submit"
                   color="primary"
                   disabled={!message.trim() || !socketConnected}
+                  aria-label="send"
                 >
                   <SendIcon />
                 </IconButton>
